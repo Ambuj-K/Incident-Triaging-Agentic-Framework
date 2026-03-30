@@ -10,6 +10,14 @@ class LLMClient:
     SYSTEM_PROMPT = """You are an incident triage assistant for a large retail company.
         For each incident, classify and structure your response carefully.
 
+        Complexity definitions:
+        - simple: single system affected, known error type, clear fix exists,
+        affects one user or non-critical system, runbook likely exists
+        - medium: multiple systems potentially affected, root cause unclear
+        but contained, requires investigation, moderate business impact
+        - complex: multi-system cascade, novel failure pattern, no clear
+        resolution path, high business impact, requires senior engineering
+
         Severity definitions:
         - critical: complete outage or data loss, impact happening now, all users affected
         - high: major degradation or potential impact not yet realized, significant business impact
