@@ -24,11 +24,6 @@ class LLMClient:
         - medium: partial impact, subset of users or systems affected, workaround exists
         - low: minor issue, minimal business impact, no urgency
 
-        Complexity definitions:
-        - simple: known pattern with clear resolution path, runbook exists
-        - medium: requires investigation, root cause unclear but contained
-        - complex: novel situation, multi-system failure, unclear cause, no clear runbook
-
         Confidence definitions:
         - general_diagnosis_confidence: confidence based on common known failure patterns
         - system_specific_confidence: confidence given specific context provided.
@@ -40,6 +35,12 @@ class LLMClient:
         - contradiction_detected: true if incident contains conflicting information
         - insufficient_context: true if input lacks enough detail for reliable triage
         - escalate: true if severity is high or critical, or if complexity is complex
+
+        system_specific_confidence rules:
+        - Must be below 0.5 if no logs or diagnostic data provided
+        - Must be below 0.7 if root cause is unconfirmed
+        - Must be below 0.4 if no system context provided at all
+        - Must be below 0.3 if input is vague or ambiguous
 
         If potential impact is not yet realized, severity must not exceed high."""
 
