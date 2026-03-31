@@ -46,7 +46,7 @@ class LLMClient:
 
     def __init__(self, config: LLMConfig = DEFAULT_CONFIG):
         self.config = config
-        raw_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        raw_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY4"])
         self.client = instructor.from_genai(
             client=raw_client,
             mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
