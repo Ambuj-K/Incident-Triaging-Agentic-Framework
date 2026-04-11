@@ -1,8 +1,3 @@
-RUNBOOK-008: Data Warehouse Ingestion Failure
-Team: Platform Engineering
-Last verified: 2026-03-05
-Last incident: 2026-02-09
-Status: Active
 yaml---
 doc_id: RUNBOOK-008
 doc_type: runbook
@@ -19,6 +14,11 @@ last_verified: 2026-03-05
 last_incident: 2026-02-09
 status: active
 ---
+RUNBOOK-008: Data Warehouse Ingestion Failure
+Team: Platform Engineering
+Last verified: 2026-03-05
+Last incident: 2026-02-09
+Status: Active
 Overview
 The data warehouse is the central repository for all operational and analytical data. Ingestion failures prevent new data from reaching the warehouse, causing downstream consumers to operate on stale data. Ingestion failures differ from ETL failures in that the ETL pipeline may be functioning correctly but the warehouse itself is rejecting or failing to persist incoming data. Root causes include warehouse cluster health issues, storage capacity exhaustion, schema conflicts, network partitions, and access control changes.
 Trigger Conditions

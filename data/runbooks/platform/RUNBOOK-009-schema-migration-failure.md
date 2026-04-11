@@ -1,8 +1,3 @@
-RUNBOOK-009: Schema Migration Failure
-Team: Platform Engineering
-Last verified: 2026-02-28
-Last incident: 2026-01-15
-Status: Active
 yaml---
 doc_id: RUNBOOK-009
 doc_type: runbook
@@ -19,6 +14,11 @@ last_verified: 2026-02-28
 last_incident: 2026-01-15
 status: active
 ---
+RUNBOOK-009: Schema Migration Failure
+Team: Platform Engineering
+Last verified: 2026-02-28
+Last incident: 2026-01-15
+Status: Active
 Overview
 Schema migrations modify the structure of database tables or data warehouse schemas — adding columns, changing types, renaming fields, dropping columns, or modifying constraints. Failed or incorrectly applied migrations cause downstream ETL jobs, application queries, and reporting pipelines to fail with schema mismatch errors. The risk window is highest immediately after deployment and during the first ETL job run post-migration. Unlike most incidents, schema migration failures often require a coordinated rollback across multiple systems simultaneously.
 Trigger Conditions

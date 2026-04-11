@@ -1,8 +1,3 @@
-RUNBOOK-007: POS Data Feed Delay
-Team: Platform Engineering
-Last verified: 2026-02-15
-Last incident: 2026-01-29
-Status: Active
 yaml---
 doc_id: RUNBOOK-007
 doc_type: runbook
@@ -19,6 +14,11 @@ last_verified: 2026-02-15
 last_incident: 2026-01-29
 status: active
 ---
+RUNBOOK-007: POS Data Feed Delay
+Team: Platform Engineering
+Last verified: 2026-02-15
+Last incident: 2026-01-29
+Status: Active
 Overview
 POS systems generate transaction data for every sale across all store locations. This data feeds the central data pipeline every 15 minutes and is the primary input for demand forecasting, inventory reconciliation, sales reporting, and executive dashboards. POS feed delays degrade forecast accuracy, delay inventory reconciliation, and produce stale sales reporting. Delays exceeding 4 hours begin to affect next-day replenishment calculations. Delays exceeding 24 hours affect weekly model retraining.
 Trigger Conditions
