@@ -1,4 +1,21 @@
+---
+doc_id: RUNBOOK-004
+doc_type: runbook
+team: commodity_team
+incident_family: supply_side
+severity_range: [medium, high, critical]
+systems:
+  - supplier_integration_api
+  - procurement_model
+  - purchase_order_system
+  - inventory_management_system
+last_verified: 2026-03-01
+last_incident: 2026-02-18
+status: active
+---
+
 RUNBOOK-004: Supplier API Timeout / Connectivity Failure
+
 Team: Commodity Team
 Last verified: 2026-03-01
 Last incident: 2026-02-18
