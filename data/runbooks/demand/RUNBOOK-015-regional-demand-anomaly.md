@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: RUNBOOK-015
 doc_type: runbook
 team: demand_forecast_team
@@ -18,6 +18,7 @@ Team: Demand & Sales Forecast Team
 Last verified: 2026-03-01
 Last incident: 2026-01-18
 Status: Active
+
 Overview
 Regional demand anomalies occur when sales velocity in a specific geographic area deviates significantly from forecast without a known promotional, seasonal, or operational explanation. Causes include unreported local events (natural disasters, civil events, health scares), competitor store closures driving demand to our locations, data quality issues producing false signals, or emerging demand patterns the model has not yet learned. The challenge is distinguishing genuine demand signals requiring supply chain response from data artifacts requiring correction. Acting on a false signal is costly. Missing a genuine signal causes stockouts.
 Trigger Conditions
