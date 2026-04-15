@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: RUNBOOK-008
 doc_type: runbook
 team: platform_engineering
@@ -14,6 +14,7 @@ last_verified: 2026-03-05
 last_incident: 2026-02-09
 status: active
 ---
+
 RUNBOOK-008: Data Warehouse Ingestion Failure
 Team: Platform Engineering
 Last verified: 2026-03-05
