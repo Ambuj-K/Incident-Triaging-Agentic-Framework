@@ -12,6 +12,7 @@ date: 2026-02-09
 status: closed
 tags: [data-warehouse, storage-exhaustion, ingestion-failure, backfill, finance-reporting, critical]
 ---
+
 INCIDENT-008: Data Warehouse Storage Exhaustion
 
 Incident Summary
