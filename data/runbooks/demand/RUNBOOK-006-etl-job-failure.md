@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: RUNBOOK-006
 doc_type: runbook
 team: platform_engineering
@@ -13,6 +13,7 @@ last_verified: 2026-03-01
 last_incident: 2026-02-21
 status: active
 ---
+
 RUNBOOK-006: ETL Job Failure
 Team: Platform Engineering
 Last verified: 2026-03-01

@@ -1,3 +1,19 @@
+---
+doc_id: RUNBOOK-003
+doc_type: runbook
+team: demand_forecast_team
+incident_family: demand_side
+severity_range: [medium, high, critical]
+systems:
+  - ml_forecasting_system
+  - replenishment_system
+  - procurement_model
+  - pos_systems
+last_verified: 2026-03-01
+last_incident: 2026-02-14
+status: active
+---
+
 RUNBOOK-003: ML Demand Forecasting Model Failure
 Overview
 The ML demand forecasting model produces weekly and daily demand forecasts for all SKUs across all store and DC locations. It is retrained every Sunday between 01:00-05:00 IST on the previous week's sales data. Forecast outputs feed the replenishment system, promotional planning, and procurement model. Model failures fall into three categories: retrain failures (model does not update), output anomalies (model updates but produces invalid forecasts), and pipeline failures (model runs but outputs do not reach downstream systems).
