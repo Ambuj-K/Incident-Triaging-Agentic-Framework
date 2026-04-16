@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: RUNBOOK-007
 doc_type: runbook
 team: platform_engineering
@@ -14,6 +14,7 @@ last_verified: 2026-02-15
 last_incident: 2026-01-29
 status: active
 ---
+
 RUNBOOK-007: POS Data Feed Delay
 Team: Platform Engineering
 Last verified: 2026-02-15
