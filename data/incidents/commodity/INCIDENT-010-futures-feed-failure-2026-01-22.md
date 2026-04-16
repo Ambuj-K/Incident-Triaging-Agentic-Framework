@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-010
 doc_type: incident_report
 team: commodity_team
@@ -12,6 +12,7 @@ date: 2026-01-22
 status: closed
 tags: [futures-feed, exchange-connectivity, manual-procurement, wheat, corn, procurement-model]
 ---
+
 INCIDENT-010: Futures Feed Failure — Manual Procurement Activated
 
 Incident Summary

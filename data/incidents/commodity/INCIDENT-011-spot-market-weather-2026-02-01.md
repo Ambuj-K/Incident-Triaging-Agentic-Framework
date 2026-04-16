@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-011
 doc_type: incident_report
 team: commodity_team
@@ -12,6 +12,7 @@ date: 2026-02-01
 status: closed
 tags: [spot-market, weather-event, stockout-risk, produce, emergency-procurement, approval-chain]
 ---
+
 INCIDENT-011: Spot Market Emergency — Weather Event Trigger
 
 Incident Summary

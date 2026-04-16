@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-002
 doc_type: incident_report
 team: commodity_team
@@ -12,6 +12,7 @@ date: 2025-12-03
 status: closed
 tags: [commodity-price-feed, procurement-model, stale-data, financial-incident, purchase-orders]
 ---
+
 INCIDENT-002: Commodity Price Feed — Orders Submitted on Stale Data
 
 Incident Summary

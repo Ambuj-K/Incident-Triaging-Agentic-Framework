@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-004
 doc_type: incident_report
 team: commodity_team
@@ -12,6 +12,7 @@ date: 2026-02-18
 status: closed
 tags: [supplier-api, grain-supplier, timeout, delivery-schedule, root-cause-unknown]
 ---
+
 INCIDENT-004: Supplier API Timeout — Root Cause Never Fully Determined
 
 Incident Summary
