@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-008
 doc_type: incident_report
 team: platform_engineering

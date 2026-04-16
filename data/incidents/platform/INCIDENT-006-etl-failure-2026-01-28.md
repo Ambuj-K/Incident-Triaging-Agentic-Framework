@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-006
 doc_type: incident_report
 team: platform_engineering
@@ -12,6 +12,7 @@ date: 2026-01-28
 status: closed
 tags: [etl, data-pipeline, schema-change, delayed-diagnosis, demand-forecast, replenishment]
 ---
+
 INCIDENT-006: ETL Job Failure — Delayed Diagnosis
 
 Incident Summary

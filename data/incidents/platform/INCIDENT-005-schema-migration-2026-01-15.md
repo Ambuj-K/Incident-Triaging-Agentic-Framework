@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-005
 doc_type: incident_report
 team: platform_engineering
@@ -12,6 +12,7 @@ date: 2026-01-15
 status: closed
 tags: [schema-migration, split-brain, transactions-table, etl-failure, data-integrity]
 ---
+
 INCIDENT-005: Schema Migration Failure — Split-Brain State
 
 Incident Summary

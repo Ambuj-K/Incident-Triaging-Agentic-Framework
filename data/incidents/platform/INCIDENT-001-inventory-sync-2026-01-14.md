@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-001
 doc_type: incident_report
 team: platform_engineering
@@ -12,6 +12,7 @@ date: 2026-01-14
 status: closed
 tags: [inventory-sync, database, connection-pool, replenishment]
 ---
+
 INCIDENT-001: Inventory Sync Failure — Clean Resolution
 
 Incident Summary

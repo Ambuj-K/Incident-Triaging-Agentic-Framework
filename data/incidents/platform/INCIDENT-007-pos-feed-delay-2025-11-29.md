@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-007
 doc_type: incident_report
 team: platform_engineering
@@ -12,6 +12,7 @@ date: 2025-11-29
 status: closed
 tags: [pos-feed, black-friday, volume-spike, integration-layer, scaling, replenishment]
 ---
+
 INCIDENT-007: POS Data Feed Delay — Holiday Period Volume Spike
 
 Incident Summary
