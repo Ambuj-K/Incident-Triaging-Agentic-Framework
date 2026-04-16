@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-013
 doc_type: incident_report
 team: demand_forecast_team
@@ -12,6 +12,7 @@ date: 2026-02-08
 status: closed
 tags: [promotional-demand, stockout, advertised-item, forecast-not-updated, customer-impact, marketing]
 ---
+
 INCIDENT-013: Promotional Demand Spike — Stockout on Advertised Item
 
 Incident Summary

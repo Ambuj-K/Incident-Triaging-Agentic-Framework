@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-015
 doc_type: incident_report
 team: platform_engineering
@@ -12,6 +12,7 @@ date: 2026-02-23
 status: closed
 tags: [cascading-failure, inventory-sync, forecast-pipeline, replenishment, database-failover, multi-team, critical]
 ---
+
 INCIDENT-015: Cascading Failure — Inventory Sync, Forecast Pipeline, and Replenishment
 
 Incident Summary

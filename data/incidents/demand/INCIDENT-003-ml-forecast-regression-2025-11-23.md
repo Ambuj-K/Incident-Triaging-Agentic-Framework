@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-003
 doc_type: incident_report
 team: demand_forecast_team
@@ -12,6 +12,7 @@ date: 2025-11-23
 status: closed
 tags: [ml-forecast, model-regression, retrain, over-ordering, perishables, replenishment]
 ---
+
 INCIDENT-003: ML Demand Forecasting — Retrain Regression Causing Systematic Over-ordering
 
 Incident Summary

@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-014
 doc_type: incident_report
 team: demand_forecast_team
@@ -12,6 +12,7 @@ date: 2026-01-18
 status: closed
 tags: [regional-demand-anomaly, weather-event, flour-rice, northeast-stores, genuine-demand, pantry-loading]
 ---
+
 INCIDENT-014: Regional Demand Anomaly — Confirmed Genuine Demand
 
 Incident Summary

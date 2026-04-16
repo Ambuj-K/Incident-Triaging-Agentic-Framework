@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: INCIDENT-012
 doc_type: incident_report
 team: demand_forecast_team
@@ -12,6 +12,7 @@ date: 2026-02-14
 status: closed
 tags: [forecast-pipeline, promotional-campaign, valentines-day, resource-contention, replenishment, delay]
 ---
+
 INCIDENT-012: Forecast Pipeline Delay — Promotional Campaign Impact
 
 Incident Summary
