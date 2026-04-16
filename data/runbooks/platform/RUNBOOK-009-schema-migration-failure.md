@@ -1,4 +1,4 @@
-yaml---
+---
 doc_id: RUNBOOK-009
 doc_type: runbook
 team: platform_engineering
@@ -14,6 +14,7 @@ last_verified: 2026-02-28
 last_incident: 2026-01-15
 status: active
 ---
+
 RUNBOOK-009: Schema Migration Failure
 Team: Platform Engineering
 Last verified: 2026-02-28

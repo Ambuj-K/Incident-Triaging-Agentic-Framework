@@ -1,3 +1,19 @@
+---
+doc_id: RUNBOOK-005
+doc_type: runbook
+team: platform_engineering
+incident_family: supply_side
+severity_range: [high, critical]
+systems:
+  - purchase_order_system
+  - procurement_model
+  - supplier_integration_api
+  - finance_reporting
+last_verified: 2026-02-20
+last_incident: 2025-12-11
+status: active
+---
+
 RUNBOOK-005: Duplicate Purchase Order Submission
 Team: Platform Engineering (Purchase Order System ownership) with Commodity Team notification
 Last verified: 2026-02-20

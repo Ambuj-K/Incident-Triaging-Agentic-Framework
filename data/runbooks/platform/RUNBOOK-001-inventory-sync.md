@@ -1,3 +1,19 @@
+---
+doc_id: RUNBOOK-001
+doc_type: runbook
+team: platform_engineering
+incident_family: data_pipeline
+severity_range: [medium, high, critical]
+systems:
+  - inventory_management_system
+  - warehouse_management_system
+  - replenishment_system
+  - pos_systems
+last_verified: 2026-03-01
+last_incident: 2026-02-03
+status: active
+---
+
 RUNBOOK-001: Inventory Sync Job Failure
 Overview
 The inventory sync job reconciles stock levels between the Warehouse Management System and the central Inventory Database. It runs every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 IST). Failure causes stock level discrepancies across DCs which propagate to replenishment decisions, procurement models, and store-facing availability data. This is one of the highest frequency incidents in retail operations.
