@@ -1,0 +1,58 @@
+[project]
+name = "incident-triage"
+version = "0.1.0"
+description = "Agentic incident triage pipeline for retail supply chain operations"
+requires-python = ">=3.11"
+dependencies = [
+    # LLM and structured outputs
+    "instructor",
+    "google-generativeai",
+    "pydantic>=2.0",
+    "python-dotenv",
+
+    # Vector store and database
+    "pgvector",
+    "psycopg2-binary",
+    "sqlalchemy",
+
+    # Embeddings and retrieval
+    "sentence-transformers>=2.2.0,<3.0.0",
+    "torch>=2.0.0,<2.4.0",
+    "langchain-community",
+    "langchain-core",
+
+    # Agent orchestration (Week 6)
+    "langgraph",
+
+    # Observability (Week 8)
+    "langfuse",
+
+    # Evals (Week 10)
+    "ragas",
+
+    # Cost optimization and model routing (Week 12)
+    "litellm",
+
+    # API layer (Week 14)
+    "fastapi",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/incident_triage"]
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
