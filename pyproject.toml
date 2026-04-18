@@ -9,33 +9,27 @@ dependencies = [
     "google-generativeai",
     "pydantic>=2.0",
     "python-dotenv",
-
     # Vector store and database
     "pgvector",
     "psycopg2-binary",
     "sqlalchemy",
-
     # Embeddings and retrieval
     "sentence-transformers>=2.2.0,<3.0.0",
     "torch>=2.0.0,<2.4.0",
     "langchain-community",
     "langchain-core",
-
     # Agent orchestration (Week 6)
     "langgraph",
-
     # Observability (Week 8)
     "langfuse",
-
     # Evals (Week 10)
     "ragas",
-
     # Cost optimization and model routing (Week 12)
     "litellm",
-
     # API layer (Week 14)
     "fastapi",
     "uvicorn",
+    "numpy<2.0",
 ]
 
 [dependency-groups]
