@@ -34,16 +34,30 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
         return {}, text
 
 
+KNOWN_SECTIONS = {
+    "overview", "trigger conditions", "severity classification",
+    "diagnostic steps", "resolution steps", "escalation criteria",
+    "related systems", "historical notes", "metadata",
+    "incident summary", "timeline", "root cause",
+    "contributing factors", "resolution", "impact",
+    "follow-up actions", "related runbook", "lessons learned",
+    "summary", "trigger conditions", "follow-up actions",
+}
+
+
 def chunk_by_section(content: str) -> list[tuple[str, str]]:
     """
-    Split markdown content by ## headers.
-    Returns list of (section_name, section_content) tuples.
+    Split markdown content by section headers.
+    Handles both markdown headers (## Header) and plain text headers.
     """
     sections = []
     current_section = "overview"
     current_content = []
 
     for line in content.split("\n"):
+        stripped = line.strip()
+
+        # Check for markdown header
         if line.startswith("## "):
             if current_content:
                 sections.append((
@@ -52,6 +66,22 @@ def chunk_by_section(content: str) -> list[tuple[str, str]]:
                 ))
             current_section = line.replace("## ", "").strip().lower()
             current_content = []
+
+        # Check for plain text header — short line matching known section names
+        elif (
+            stripped
+            and stripped.lower() in KNOWN_SECTIONS
+            and len(stripped.split()) <= 5
+            and not stripped.endswith(".")
+        ):
+            if current_content:
+                sections.append((
+                    current_section,
+                    "\n".join(current_content).strip()
+                ))
+            current_section = stripped.lower()
+            current_content = []
+
         else:
             current_content.append(line)
 
