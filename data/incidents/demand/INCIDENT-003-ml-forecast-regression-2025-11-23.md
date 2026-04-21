@@ -16,25 +16,25 @@ tags: [ml-forecast, model-regression, retrain, over-ordering, perishables, reple
 INCIDENT-003: ML Demand Forecasting — Retrain Regression Causing Systematic Over-ordering
 
 Incident Summary
-Weekly model retrain completed on Sunday 2025-11-23 and was promoted to production at 05:30 IST. The retrained model had been trained on data including the previous year's pre-Diwali demand surge which inflated baseline assumptions for produce and dairy categories. By 09:00 IST the replenishment system had generated orders 60-80% above normal volume for perishable categories based on the inflated forecasts. Regression was identified at 11:15 IST by a demand analyst reviewing morning replenishment reports. Model rolled back at 14:20 IST. Orders already submitted to suppliers were reviewed — 34% were cancelled or reduced, 66% were accepted and contingency plans made for excess perishable inventory.
+Weekly model retrain completed on Sunday 2025-11-23 and was promoted to production at 05:30 EST. The retrained model had been trained on data including the previous year's pre-Diwali demand surge which inflated baseline assumptions for produce and dairy categories. By 09:00 EST the replenishment system had generated orders 60-80% above normal volume for perishable categories based on the inflated forecasts. Regression was identified at 11:15 EST by a demand analyst reviewing morning replenishment reports. Model rolled back at 14:20 EST. Orders already submitted to suppliers were reviewed — 34% were cancelled or reduced, 66% were accepted and contingency plans made for excess perishable inventory.
 Timeline
 
-2025-11-23 01:00 IST — Weekly model retrain job started
-2025-11-23 05:15 IST — Retrain completed — validation MAPE 11.2% (within 15% threshold)
-2025-11-23 05:30 IST — New model promoted to production
-2025-11-23 06:00 IST — Replenishment system began consuming new model forecasts
-2025-11-23 07:30 IST — Automated replenishment orders began generating
-2025-11-23 09:00 IST — 847 replenishment orders generated for produce and dairy
-2025-11-23 11:15 IST — Demand analyst flagged unusually high order volumes in morning report
-2025-11-23 11:22 IST — Replenishment system switched to manual approval mode
-2025-11-23 11:35 IST — Model comparison run — new model vs previous on last 14 days actual data
-2025-11-23 12:10 IST — Regression confirmed — new model MAPE 22.4% vs previous model 9.8% on same period
-2025-11-23 12:15 IST — Demand Forecast Team lead notified — rollback decision initiated
-2025-11-23 13:00 IST — Commodity team notified — procurement model paused
-2025-11-23 14:20 IST — Model rolled back to previous version
-2025-11-23 14:35 IST — Replenishment system re-enabled with rollback model
-2025-11-23 15:00 IST — Order review completed — 34% of 847 orders cancelled or reduced
-2025-11-23 17:30 IST — Incident closed
+2025-11-23 01:00 EST — Weekly model retrain job started
+2025-11-23 05:15 EST — Retrain completed — validation MAPE 11.2% (within 15% threshold)
+2025-11-23 05:30 EST — New model promoted to production
+2025-11-23 06:00 EST — Replenishment system began consuming new model forecasts
+2025-11-23 07:30 EST — Automated replenishment orders began generating
+2025-11-23 09:00 EST — 847 replenishment orders generated for produce and dairy
+2025-11-23 11:15 EST — Demand analyst flagged unusually high order volumes in morning report
+2025-11-23 11:22 EST — Replenishment system switched to manual approval mode
+2025-11-23 11:35 EST — Model comparison run — new model vs previous on last 14 days actual data
+2025-11-23 12:10 EST — Regression confirmed — new model MAPE 22.4% vs previous model 9.8% on same period
+2025-11-23 12:15 EST — Demand Forecast Team lead notified — rollback decision initiated
+2025-11-23 13:00 EST — Commodity team notified — procurement model paused
+2025-11-23 14:20 EST — Model rolled back to previous version
+2025-11-23 14:35 EST — Replenishment system re-enabled with rollback model
+2025-11-23 15:00 EST — Order review completed — 34% of 847 orders cancelled or reduced
+2025-11-23 17:30 EST — Incident closed
 
 Root Cause
 Training data for the retrain included November 2024 data which contained an unusually large Diwali demand surge (Diwali fell in late October-early November 2024). The model learned inflated seasonal coefficients for produce and dairy in November. The validation MAPE of 11.2% passed the threshold because the holdout set also included the Diwali period — the model performed well on the holdout but both training and holdout reflected the anomalous demand event.

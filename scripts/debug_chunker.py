@@ -2,7 +2,7 @@ from pathlib import Path
 from incident_triage.retrieval.chunker import parse_frontmatter, chunk_by_section
 
 # Test on one runbook
-file_path = Path("data/runbooks/platform/RUNBOOK-001-inventory-sync.md")
+file_path = Path("data/runbooks/commodity/RUNBOOK-002-price-feed-failure.md")
 text = file_path.read_text(encoding="utf-8")
 metadata, content = parse_frontmatter(text)
 
