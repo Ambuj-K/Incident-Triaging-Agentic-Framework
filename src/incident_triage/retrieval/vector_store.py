@@ -128,6 +128,7 @@ def search_similar(
     team: str = None,
     doc_type: str = None,
     incident_family: str = None,
+    deduplicate: bool = True,
 ) -> list[dict]:
     """
     Search for similar chunks using cosine similarity.
@@ -166,14 +167,21 @@ def search_similar(
     """
 
     embedding_array = np.array(query_embedding)
-    params = [embedding_array] + params + [embedding_array, top_k]
+    fetch_k = top_k * 3
+    params = [embedding_array] + params + [embedding_array, fetch_k]
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
 
     results = []
+    seen_doc_ids = set()
+
     for row in rows:
+        doc_id = row[0]
+        if deduplicate and doc_id in seen_doc_ids:
+            continue
+        seen_doc_ids.add(doc_id)
         results.append({
             "doc_id": row[0],
             "doc_type": row[1],
@@ -185,7 +193,7 @@ def search_similar(
             "similarity": float(row[7]),
         })
 
-    return results
+    return results[:top_k]
 
 def get_connection(retries: int = 3, delay: int = 2):
     """Get database connection with retry for Neon cold starts."""

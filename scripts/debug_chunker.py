@@ -14,3 +14,10 @@ print("\n=== SECTIONS FOUND ===")
 sections = chunk_by_section(content)
 for name, section_content in sections:
     print(f"  [{name}]: {len(section_content.split())} words")
+
+file_path = Path("data/runbooks/commodity/RUNBOOK-002-price-feed-failure.md")
+text = file_path.read_text(encoding="utf-8")
+metadata, content = parse_frontmatter(text)
+sections = chunk_by_section(content)
+for name, section_content in sections:
+    print(f"[{name}]: {section_content[:100]}")

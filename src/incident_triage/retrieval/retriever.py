@@ -48,17 +48,17 @@ def retrieve_for_incident(
     """
     runbooks = retrieve(
         query=incident_description,
-        top_k=top_k,
+        top_k=top_k * 2,  # fetch more, deduplicate down
         doc_type="runbook",
     )
 
     past_incidents = retrieve(
         query=incident_description,
-        top_k=top_k,
+        top_k=top_k * 2,
         doc_type="incident_report",
     )
 
     return {
-        "runbooks": runbooks,
-        "past_incidents": past_incidents,
+        "runbooks": runbooks[:top_k],
+        "past_incidents": past_incidents[:top_k],
     }
