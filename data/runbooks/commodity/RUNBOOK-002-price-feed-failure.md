@@ -19,7 +19,7 @@ Overview
 The commodity price feed ingests real-time and futures pricing data for grain, produce, and dairy commodities from external market data providers. This feed drives the procurement model's sourcing decisions including purchase order generation, supplier selection, and contract vs spot market decisions. Stale or missing price data causes procurement model to operate on incorrect assumptions, potentially generating financially significant erroneous purchase orders.
 Trigger Conditions
 
-Price feed last update age exceeds 2 hours during market hours (09:00-17:00 IST)
+Price feed last update age exceeds 2 hours during market hours (09:00-17:00 EST)
 Price feed last update age exceeds 6 hours outside market hours
 Commodity price variance >15% from previous close with no market event explanation
 Procurement model alert: operating_on_stale_price_data = true
