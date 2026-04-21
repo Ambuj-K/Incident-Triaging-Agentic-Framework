@@ -19,25 +19,25 @@ Incident Summary
 A schema migration adding two new columns to the transactions table was deployed as part of a rolling application deployment. The migration completed on the primary database node but failed on replica node 2 of 3 due to a disk space constraint. The result was a split-brain schema state where the primary and replica 1 had the new schema while replica 2 had the old schema. ETL jobs reading from replica 2 began failing with column not found errors 12 minutes after deployment. Application traffic routed to replica 2 returned inconsistent query results. Resolution required emergency disk expansion on replica 2, manual migration application, and schema validation across all nodes. Total duration 267 minutes including a 90-minute window of degraded ETL operations and inconsistent reporting data.
 Timeline
 
-2026-01-15 09:00 IST — Schema migration deployed as part of v4.2.1 rolling deployment
-2026-01-15 09:03 IST — Migration completed on primary node and replica 1
-2026-01-15 09:04 IST — Migration failed on replica 2 — disk space error (disk at 97% utilization)
-2026-01-15 09:05 IST — Deployment pipeline marked migration as successful (2 of 3 nodes succeeded — threshold was >50%)
-2026-01-15 09:12 IST — First ETL job failure reported — column transaction_channel not found
-2026-01-15 09:15 IST — Second ETL job failure — same error
-2026-01-15 09:18 IST — Platform engineering on-call paged
-2026-01-15 09:25 IST — ETL jobs halted to prevent failure accumulation
-2026-01-15 09:35 IST — Schema version checked across all nodes — split-brain confirmed
-2026-01-15 09:40 IST — DBA engaged — disk space issue on replica 2 identified
-2026-01-15 09:45 IST — Data engineering lead notified — escalation decision made
-2026-01-15 10:00 IST — Emergency disk expansion initiated on replica 2
-2026-01-15 10:45 IST — Disk expansion completed — 50GB freed
-2026-01-15 11:00 IST — Migration applied manually to replica 2
-2026-01-15 11:15 IST — Schema validation run across all three nodes — consistent
-2026-01-15 11:20 IST — ETL jobs re-enabled — first successful run confirmed
-2026-01-15 11:30 IST — Application traffic to replica 2 restored
-2026-01-15 13:27 IST — Backfill ETL jobs completed for 90-minute gap
-2026-01-15 13:27 IST — Incident closed
+2026-01-15 09:00 EST — Schema migration deployed as part of v4.2.1 rolling deployment
+2026-01-15 09:03 EST — Migration completed on primary node and replica 1
+2026-01-15 09:04 EST — Migration failed on replica 2 — disk space error (disk at 97% utilization)
+2026-01-15 09:05 EST — Deployment pipeline marked migration as successful (2 of 3 nodes succeeded — threshold was >50%)
+2026-01-15 09:12 EST — First ETL job failure reported — column transaction_channel not found
+2026-01-15 09:15 EST — Second ETL job failure — same error
+2026-01-15 09:18 EST — Platform engineering on-call paged
+2026-01-15 09:25 EST — ETL jobs halted to prevent failure accumulation
+2026-01-15 09:35 EST — Schema version checked across all nodes — split-brain confirmed
+2026-01-15 09:40 EST — DBA engaged — disk space issue on replica 2 identified
+2026-01-15 09:45 EST — Data engineering lead notified — escalation decision made
+2026-01-15 10:00 EST — Emergency disk expansion initiated on replica 2
+2026-01-15 10:45 EST — Disk expansion completed — 50GB freed
+2026-01-15 11:00 EST — Migration applied manually to replica 2
+2026-01-15 11:15 EST — Schema validation run across all three nodes — consistent
+2026-01-15 11:20 EST — ETL jobs re-enabled — first successful run confirmed
+2026-01-15 11:30 EST — Application traffic to replica 2 restored
+2026-01-15 13:27 EST — Backfill ETL jobs completed for 90-minute gap
+2026-01-15 13:27 EST — Incident closed
 
 Root Cause
 Schema migration applied during rolling deployment with an insufficiently strict success threshold (>50% of nodes). Replica 2 had disk utilization at 97% — insufficient space to apply the migration. Disk space monitoring had an alert threshold of 95% but the alert was in a suppressed state from a previous incident and had not been re-enabled.
