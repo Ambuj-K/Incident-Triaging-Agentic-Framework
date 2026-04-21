@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from pgvector.psycopg2 import register_vector
-import psycopg2
+import psycopg2, time
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from incident_triage.retrieval.chunker import Chunk
@@ -186,3 +186,22 @@ def search_similar(
         })
 
     return results
+
+def get_connection(retries: int = 3, delay: int = 2):
+    """Get database connection with retry for Neon cold starts."""
+    last_error = None
+    for attempt in range(retries):
+        try:
+            conn = psycopg2.connect(
+                os.environ["DATABASE_URL"],
+                sslmode="require",
+                connect_timeout=10,
+            )
+            return conn
+        except psycopg2.OperationalError as e:
+            last_error = e
+            if attempt < retries - 1:
+                print(f"Connection attempt {attempt + 1} failed, retrying in {delay}s...")
+                time.sleep(delay)
+                delay *= 2
+    raise last_error
