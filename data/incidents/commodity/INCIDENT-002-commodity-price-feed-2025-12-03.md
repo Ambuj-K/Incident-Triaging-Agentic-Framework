@@ -16,28 +16,28 @@ tags: [commodity-price-feed, procurement-model, stale-data, financial-incident, 
 INCIDENT-002: Commodity Price Feed — Orders Submitted on Stale Data
 
 Incident Summary
-External commodity price feed provider API credentials expired at 06:00 IST. Feed ingestion silently failed — no alert fired because the ingestion job returned exit code 0 despite writing zero records. Procurement model continued operating on 19-hour-old price data. Three automated purchase orders totaling $1.84M were submitted to grain suppliers between 08:00 and 10:30 IST based on stale pricing. Feed failure detected at 10:47 IST by commodity analyst who noticed flat price curves in dashboard. Two of three orders were placed on hold with suppliers. One order ($340,000) was acknowledged and partially fulfilled before hold was applied. Financial exposure from price discrepancy: approximately $67,000.
+External commodity price feed provider API credentials expired at 06:00 EST. Feed ingestion silently failed — no alert fired because the ingestion job returned exit code 0 despite writing zero records. Procurement model continued operating on 19-hour-old price data. Three automated purchase orders totaling $1.84M were submitted to grain suppliers between 08:00 and 10:30 EST based on stale pricing. Feed failure detected at 10:47 EST by commodity analyst who noticed flat price curves in dashboard. Two of three orders were placed on hold with suppliers. One order ($340,000) was acknowledged and partially fulfilled before hold was applied. Financial exposure from price discrepancy: approximately $67,000.
 Timeline
 
-06:00 IST — API credentials expired, feed ingestion job started failing silently
-06:15 IST — Ingestion job completed with exit code 0, zero records written — no alert fired
-08:00 IST — Procurement model morning run began using 19-hour-old price data
-08:34 IST — First purchase order ($620,000 wheat) submitted to primary grain supplier
-09:12 IST — Second purchase order ($780,000 corn) submitted
-10:05 IST — Third purchase order ($440,000 soy) submitted
-10:47 IST — Commodity analyst noticed flat price curves in dashboard — raised concern
-10:52 IST — Feed failure confirmed — last actual data timestamp 11:00 IST previous day
-10:55 IST — Procurement model automated order generation halted immediately
-11:03 IST — Commodity team lead notified — escalated to financial incident
-11:15 IST — Supplier contacted for order 1 (wheat) — placed on hold pending price review
-11:22 IST — Supplier contacted for order 2 (corn) — placed on hold
-11:31 IST — Supplier contacted for order 3 (soy) — partial fulfillment already initiated, $340,000 committed
-12:20 IST — API credentials rotated, feed ingestion restored
-12:35 IST — Fresh price data confirmed loading correctly
-13:10 IST — Procurement model simulation run with correct prices
-13:45 IST — Procurement model re-enabled with commodity team lead sign-off
-15:00 IST — Finance team notified of $67,000 price discrepancy exposure on partially fulfilled order
-17:00 IST — Incident closed pending finance reconciliation
+06:00 EST — API credentials expired, feed ingestion job started failing silently
+06:15 EST — Ingestion job completed with exit code 0, zero records written — no alert fired
+08:00 EST — Procurement model morning run began using 19-hour-old price data
+08:34 EST — First purchase order ($620,000 wheat) submitted to primary grain supplier
+09:12 EST — Second purchase order ($780,000 corn) submitted
+10:05 EST — Third purchase order ($440,000 soy) submitted
+10:47 EST — Commodity analyst noticed flat price curves in dashboard — raised concern
+10:52 EST — Feed failure confirmed — last actual data timestamp 11:00 EST previous day
+10:55 EST — Procurement model automated order generation halted immediately
+11:03 EST — Commodity team lead notified — escalated to financial incident
+11:15 EST — Supplier contacted for order 1 (wheat) — placed on hold pending price review
+11:22 EST — Supplier contacted for order 2 (corn) — placed on hold
+11:31 EST — Supplier contacted for order 3 (soy) — partial fulfillment already initiated, $340,000 committed
+12:20 EST — API credentials rotated, feed ingestion restored
+12:35 EST — Fresh price data confirmed loading correctly
+13:10 EST — Procurement model simulation run with correct prices
+13:45 EST — Procurement model re-enabled with commodity team lead sign-off
+15:00 EST — Finance team notified of $67,000 price discrepancy exposure on partially fulfilled order
+17:00 EST — Incident closed pending finance reconciliation
 
 Root Cause
 API credentials expired on schedule (every 6 months) but credential rotation reminder was not actioned. The critical secondary failure was the ingestion job returning exit code 0 despite writing zero records — the job treated an authentication failure as a successful empty run, suppressing any alert.
