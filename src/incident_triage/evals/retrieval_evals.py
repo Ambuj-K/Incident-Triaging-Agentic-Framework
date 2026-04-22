@@ -84,6 +84,43 @@ RETRIEVAL_TEST_CASES = [
         team="demand_forecast_team",
         incident_family="demand_side",
     ),
+    # Add to RETRIEVAL_TEST_CASES in retrieval_evals.py
+
+    RetrievalTestCase(
+        query="PO duplication 6 suppliers",
+        expected_runbook="RUNBOOK-005",
+        expected_incident="INCIDENT-009",
+        team="platform_engineering",
+        incident_family="supply_side",
+    ),
+    RetrievalTestCase(
+        query="sync job down DCs wrong stock",
+        expected_runbook="RUNBOOK-001",
+        expected_incident="INCIDENT-001",
+        team="platform_engineering",
+        incident_family="data_pipeline",
+    ),
+    RetrievalTestCase(
+        query="errno 28 warehouse writes failing",
+        expected_runbook="RUNBOOK-008",
+        expected_incident="INCIDENT-008",
+        team="platform_engineering",
+        incident_family="data_pipeline",
+    ),
+    RetrievalTestCase(
+        query="ML model retrain gone wrong produce negative",
+        expected_runbook="RUNBOOK-003",
+        expected_incident="INCIDENT-003",
+        team="demand_forecast_team",
+        incident_family="demand_side",
+    ),
+    RetrievalTestCase(
+        query="spot market needed weather DC stockout risk",
+        expected_runbook="RUNBOOK-011",
+        expected_incident="INCIDENT-011",
+        team="commodity_team",
+        incident_family="supply_side",
+    ),
 ]
 
 
