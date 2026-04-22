@@ -121,6 +121,41 @@ RETRIEVAL_TEST_CASES = [
         team="commodity_team",
         incident_family="supply_side",
     ),
+    RetrievalTestCase(
+    query="exit code 0 but nothing written",
+    expected_runbook="RUNBOOK-006",
+    expected_incident="INCIDENT-006",
+    team="platform_engineering",
+    incident_family="data_pipeline",
+    ),
+    RetrievalTestCase(
+        query="ivfflat index OOM during ingestion",
+        expected_runbook="RUNBOOK-008",
+        expected_incident="INCIDENT-008",
+        team="platform_engineering",
+        incident_family="data_pipeline",
+    ),
+    RetrievalTestCase(
+        query="CBOT hours grain API slow",
+        expected_runbook="RUNBOOK-004",
+        expected_incident="INCIDENT-004",
+        team="commodity_team",
+        incident_family="supply_side",
+    ),
+    RetrievalTestCase(
+        query="BGP routing issue all external APIs down",
+        expected_runbook="RUNBOOK-004",
+        expected_incident="INCIDENT-004",
+        team="commodity_team",
+        incident_family="supply_side",
+    ),
+    RetrievalTestCase(
+        query="retrain MAPE 22% previous 9%",
+        expected_runbook="RUNBOOK-014",
+        expected_incident="INCIDENT-003",
+        team="demand_forecast_team",
+        incident_family="demand_side",
+    ),
 ]
 
 
