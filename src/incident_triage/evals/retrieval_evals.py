@@ -1,7 +1,3 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
-
 from dataclasses import dataclass
 from incident_triage.retrieval.retriever import retrieve_for_incident
 
