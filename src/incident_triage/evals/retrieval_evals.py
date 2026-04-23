@@ -269,11 +269,11 @@ def evaluate_hybrid_retrieval(
             "expected_runbook": case.expected_runbook,
             "got_runbook": runbook_ids[0] if runbook_ids else "none",
             "runbook_p1": runbook_p1,
-            "runbook_score": top_runbook.get("rrf_score", 0) if top_runbook else 0,
+            "runbook_similarity": top_runbook.get("rrf_score", 0) if top_runbook else 0,
             "expected_incident": case.expected_incident,
             "got_incident": incident_ids[0] if incident_ids else "none",
             "incident_p1": incident_p1,
-            "incident_score": top_incident.get("rrf_score", 0) if top_incident else 0,
+            "incident_similarity": top_incident.get("rrf_score", 0) if top_incident else 0,
         })
 
     total = results["total"]
