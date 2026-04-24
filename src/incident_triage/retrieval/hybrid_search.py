@@ -1,5 +1,4 @@
-import os
-import math
+import os, re
 import numpy as np
 from collections import defaultdict
 from sentence_transformers import SentenceTransformer
@@ -208,37 +207,47 @@ def reciprocal_rank_fusion(
     return results
 
 
-def hybrid_search(
-    query: str,
-    doc_type: str = None,
-    team: str = None,
-    incident_family: str = None,
-    top_k: int = 5,
-) -> list[dict]:
+def query_needs_keyword_boost(query: str) -> bool:
     """
-    Full hybrid search combining vector similarity and keyword search
-    via Reciprocal Rank Fusion. Returns deduplicated top_k results.
+    Detect queries containing technical terms that semantic search
+    handles poorly and keyword search can help with.
     """
+    # Acronyms (2-6 uppercase letters)
+    has_acronym = bool(re.search(r'\b[A-Z]{2,6}\b', query))
+    # Error codes or exit codes
+    has_error_code = bool(re.search(r'(error|exit|errno|code)\s+\w+', query, re.IGNORECASE))
+    # Percentage values
+    has_percentage = bool(re.search(r'\d+%', query))
+    # Version numbers or specific metrics
+    has_metric = bool(re.search(r'\d+\.\d+|\d+[kmg]b', query, re.IGNORECASE))
+
+    return has_acronym or has_error_code or has_percentage or has_metric
+
+
+def hybrid_search(query, doc_type=None, team=None, incident_family=None, top_k=5):
     model = get_model()
     query_embedding = model.encode(query, convert_to_numpy=True).tolist()
 
     vec_results = vector_search(
         query_embedding=query_embedding,
         doc_type=doc_type,
-        team=team,
-        incident_family=incident_family,
         top_k=top_k * 3,
     )
 
-    kw_results = keyword_search(
-        query=query,
-        doc_type=doc_type,
-        team=team,
-        incident_family=incident_family,
-        top_k=top_k * 3,
-    )
-
-    fused = reciprocal_rank_fusion(vec_results, kw_results)
+    # Only activate keyword search when query has technical terms
+    if query_needs_keyword_boost(query):
+        kw_results = keyword_search(query=query, doc_type=doc_type, top_k=top_k * 3)
+        fused = reciprocal_rank_fusion(
+            vec_results, kw_results,
+            vector_weight=0.6,
+            keyword_weight=0.4,
+        )
+    else:
+        # Pure vector search — keyword would add noise
+        fused = [
+            {**r, "rrf_score": 1.0 / (60 + rank + 1)}
+            for rank, r in enumerate(vec_results)
+        ]
 
     # Deduplicate by doc_id
     seen = set()
