@@ -587,6 +587,31 @@ RRF is robust to relative weighting across signal types.
 
 ---
 
+### Iteration 5.9 — Targeted Corpus Addition + Final Hybrid Results
+**Changes made:**
+- Added errno 28 / ENOSPC language to INCIDENT-008 historical notes
+- Added MAPE percentage threshold language to RUNBOOK-014 trigger conditions
+
+**Results after corpus addition:**Hybrid: Runbook P@1 95%, Incident P@1 90%, Both P@1 85%
+
+**Improvement from corpus addition:** +5% incident P@1 vs previous hybrid run
+
+**Two remaining failures accepted:**
+- ivfflat index OOM: infrastructure terminology not in corpus, unfixable
+  without new incident type, not a realistic production query
+- CBOT hours grain API slow: broad semantic overlap of INCIDENT-002
+  dominates, would require significant INCIDENT-010 content additions
+
+**Final retrieval layer decision:** Accept 95%/90% P@1, 100% P@3.
+P@3 100% means agent always has correct context in top 3 results.
+
+### Iteration 5.10 — Metadata Filtering (Next)
+Implement team and incident_family filtering before vector search.
+Expected benefit: faster retrieval, better precision on domain-specific
+queries, enables domain-aware routing in LangGraph agent.
+
+---
+
 ## Decisions Locked
 
 These decisions were made deliberately and should not be revisited
