@@ -126,13 +126,11 @@ def keyword_search(
 
     # Convert query to tsquery — handle special characters
     # Replace non-alphanumeric with spaces, split into terms
-    import re
     terms = re.findall(r'\w+', query.lower())
     if not terms:
         conn.close()
         return []
 
-    # Use plainto_tsquery for robust parsing
     # Use OR logic — any term matching surfaces the document
     # Critical for short technical queries like "CBOT hours grain API slow"
     stop_words = {
