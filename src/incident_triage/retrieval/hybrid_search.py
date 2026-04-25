@@ -133,7 +133,25 @@ def keyword_search(
         return []
 
     # Use plainto_tsquery for robust parsing
-    ts_query = " & ".join(terms)
+    # Use OR logic — any term matching surfaces the document
+    # Critical for short technical queries like "CBOT hours grain API slow"
+    stop_words = {
+        'the', 'a', 'an', 'is', 'in', 'on', 'at', 'to', 'for',
+        'of', 'and', 'or', 'but', 'with', 'from', 'by', 'not',
+        'was', 'were', 'are', 'been', 'has', 'had', 'have',
+        'during', 'after', 'before', 'while', 'when', 'than',
+    }
+
+    filtered_terms = [
+        t for t in terms
+        if t not in stop_words and len(t) > 2
+    ]
+
+    if not filtered_terms:
+        conn.close()
+        return []
+
+    ts_query = " | ".join(filtered_terms)
 
     filter_clause = ""
     if filters:
@@ -143,15 +161,18 @@ def keyword_search(
         SELECT
             doc_id, doc_type, team, incident_family,
             section, content, source_file,
-            ts_rank(to_tsvector('english', content), plainto_tsquery('english', %s)) as rank
+            ts_rank(
+                to_tsvector('english', content),
+                to_tsquery('english', %s)
+            ) as rank
         FROM document_chunks
-        WHERE to_tsvector('english', content) @@ plainto_tsquery('english', %s)
+        WHERE to_tsvector('english', content) @@ to_tsquery('english', %s)
         {filter_clause}
         ORDER BY rank DESC
         LIMIT %s;
     """
 
-    all_params = [query, query] + params + [top_k]
+    all_params = [ts_query, ts_query] + params + [top_k]
     cursor.execute(sql, all_params)
     rows = cursor.fetchall()
     conn.close()
@@ -175,28 +196,27 @@ def reciprocal_rank_fusion(
     vector_results: list[dict],
     keyword_results: list[dict],
     k: int = 60,
+    vector_weight: float = 0.7,
+    keyword_weight: float = 0.3,
 ) -> list[dict]:
-    """
-    Combine vector and keyword results using Reciprocal Rank Fusion.
-    RRF score = 1/(k + rank) summed across both result lists.
-    k=60 is the standard value from the original RRF paper.
-    """
     scores = defaultdict(float)
     doc_data = {}
 
     for rank, result in enumerate(vector_results):
         doc_id = result["doc_id"]
-        scores[doc_id] += 1.0 / (k + rank + 1)
+        scores[doc_id] += vector_weight / (k + rank + 1)
         if doc_id not in doc_data:
             doc_data[doc_id] = result
 
     for rank, result in enumerate(keyword_results):
         doc_id = result["doc_id"]
-        scores[doc_id] += 1.0 / (k + rank + 1)
+        scores[doc_id] += keyword_weight / (k + rank + 1)
         if doc_id not in doc_data:
             doc_data[doc_id] = result
 
-    sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    sorted_docs = sorted(
+        scores.items(), key=lambda x: x[1], reverse=True
+    )
 
     results = []
     for doc_id, rrf_score in sorted_docs:
@@ -210,46 +230,78 @@ def reciprocal_rank_fusion(
 def query_needs_keyword_boost(query: str) -> bool:
     """
     Detect queries containing technical terms that semantic search
-    handles poorly and keyword search can help with.
+    handles poorly — acronyms, error codes, exact metric values.
     """
-    # Acronyms (2-6 uppercase letters)
+    # Uppercase acronyms (2-6 chars)
     has_acronym = bool(re.search(r'\b[A-Z]{2,6}\b', query))
-    # Error codes or exit codes
-    has_error_code = bool(re.search(r'(error|exit|errno|code)\s+\w+', query, re.IGNORECASE))
+    # Error or exit codes
+    has_error_code = bool(
+        re.search(r'(error|exit|errno|code)\s+\w+', query, re.IGNORECASE)
+    )
     # Percentage values
     has_percentage = bool(re.search(r'\d+%', query))
-    # Version numbers or specific metrics
-    has_metric = bool(re.search(r'\d+\.\d+|\d+[kmg]b', query, re.IGNORECASE))
+    # Technical metric names
+    has_metric = bool(
+    re.search(
+        r'\b(MAPE|MRR|RMSE|MAE|OOM|BM25|RRF)\b|\d+\.\d+',
+        query,
+        re.IGNORECASE
+            )
+    )
 
     return has_acronym or has_error_code or has_percentage or has_metric
 
 
-def hybrid_search(query, doc_type=None, team=None, incident_family=None, top_k=5):
+MIN_KEYWORD_RANK = 0.0001
+
+def hybrid_search(
+    query: str,
+    doc_type: str = None,
+    team: str = None,
+    incident_family: str = None,
+    top_k: int = 5,
+) -> list[dict]:
     model = get_model()
-    query_embedding = model.encode(query, convert_to_numpy=True).tolist()
+    query_embedding = model.encode(
+        query, convert_to_numpy=True
+    ).tolist()
 
     vec_results = vector_search(
         query_embedding=query_embedding,
         doc_type=doc_type,
+        team=team,
+        incident_family=incident_family,
         top_k=top_k * 3,
     )
 
-    # Only activate keyword search when query has technical terms
+    # Only activate keyword search for technical queries
     if query_needs_keyword_boost(query):
-        kw_results = keyword_search(query=query, doc_type=doc_type, top_k=top_k * 3)
+        kw_results = keyword_search(
+            query=query,
+            doc_type=doc_type,
+            team=team,
+            incident_family=incident_family,
+            top_k=top_k * 3,
+        )
+
+        kw_results = [
+            r for r in kw_results
+            if r["keyword_rank"] > MIN_KEYWORD_RANK
+        ]
+
         fused = reciprocal_rank_fusion(
-            vec_results, kw_results,
-            vector_weight=0.6,
-            keyword_weight=0.4,
+            vec_results,
+            kw_results,
+            vector_weight=0.7,
+            keyword_weight=0.3,
         )
     else:
-        # Pure vector search — keyword would add noise
+        # Pure vector — keyword would add noise on normal queries
         fused = [
-            {**r, "rrf_score": 1.0 / (60 + rank + 1)}
+            {**r, "rrf_score": 0.7 / (60 + rank + 1)}
             for rank, r in enumerate(vec_results)
         ]
 
-    # Deduplicate by doc_id
     seen = set()
     deduped = []
     for result in fused:
