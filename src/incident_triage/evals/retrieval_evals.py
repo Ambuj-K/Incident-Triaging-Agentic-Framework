@@ -286,6 +286,92 @@ def evaluate_hybrid_retrieval(
     return results
 
 
+def evaluate_filtered_retrieval(
+    test_cases: list[RetrievalTestCase],
+    top_k: int = 5,
+) -> dict:
+    """
+    Eval using hybrid search with metadata filtering.
+    Passes team and incident_family as filters to narrow
+    retrieval before vector search.
+    """
+    results = {
+        "total": len(test_cases),
+        "runbook_p1": 0,
+        "runbook_p3": 0,
+        "incident_p1": 0,
+        "incident_p3": 0,
+        "both_p1": 0,
+        "details": [],
+    }
+
+    for case in test_cases:
+        # Use team and incident_family from ground truth
+        # In production this comes from IncidentReport.affected_systems
+        retrieved = retrieve_for_incident(
+            incident_description=case.query,
+            top_k=top_k,
+            affected_systems=[],  # empty — filter inferred from team below
+            use_hybrid=True,
+        )
+
+        # Override with ground truth filters for eval
+        from incident_triage.retrieval.hybrid_search import hybrid_search
+        runbooks = hybrid_search(
+            query=case.query,
+            doc_type="runbook",
+            team=case.team,
+            incident_family=case.incident_family,
+            top_k=top_k,
+        )
+        past_incidents = hybrid_search(
+            query=case.query,
+            doc_type="incident_report",
+            team=case.team,
+            incident_family=case.incident_family,
+            top_k=top_k,
+        )
+
+        runbook_ids = [r["doc_id"] for r in runbooks]
+        incident_ids = [r["doc_id"] for r in past_incidents]
+
+        runbook_p1 = len(runbook_ids) > 0 and runbook_ids[0] == case.expected_runbook
+        runbook_p3 = case.expected_runbook in runbook_ids[:3]
+        incident_p1 = len(incident_ids) > 0 and incident_ids[0] == case.expected_incident
+        incident_p3 = case.expected_incident in incident_ids[:3]
+        both_p1 = runbook_p1 and incident_p1
+
+        if runbook_p1: results["runbook_p1"] += 1
+        if runbook_p3: results["runbook_p3"] += 1
+        if incident_p1: results["incident_p1"] += 1
+        if incident_p3: results["incident_p3"] += 1
+        if both_p1: results["both_p1"] += 1
+
+        top_runbook = runbooks[0] if runbooks else None
+        top_incident = past_incidents[0] if past_incidents else None
+
+        results["details"].append({
+            "query": case.query[:60],
+            "expected_runbook": case.expected_runbook,
+            "got_runbook": runbook_ids[0] if runbook_ids else "none",
+            "runbook_p1": runbook_p1,
+            "runbook_similarity": top_runbook.get("rrf_score", 0) if top_runbook else 0,
+            "expected_incident": case.expected_incident,
+            "got_incident": incident_ids[0] if incident_ids else "none",
+            "incident_p1": incident_p1,
+            "incident_similarity": top_incident.get("rrf_score", 0) if top_incident else 0,
+        })
+
+    total = results["total"]
+    results["runbook_p1_rate"] = results["runbook_p1"] / total
+    results["runbook_p3_rate"] = results["runbook_p3"] / total
+    results["incident_p1_rate"] = results["incident_p1"] / total
+    results["incident_p3_rate"] = results["incident_p3"] / total
+    results["both_p1_rate"] = results["both_p1"] / total
+
+    return results
+
+
 def print_eval_report(results: dict):
     """Print formatted eval report."""
     print("\n" + "="*60)
