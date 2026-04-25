@@ -30,6 +30,7 @@ Replenishment system generating orders significantly different from historical p
 Actual vs forecast variance report showing systematic bias (consistently over or under forecasting)
 Data science team raises concern about model validation metrics post-retrain
 Unusual distribution of forecast values (more extreme values than historical model)
+Model comparison showing new model MAPE >20% vs previous model MAPE <10% — greater than 10 percentage point degradation confirms regression.
 
 Severity Classification
 
