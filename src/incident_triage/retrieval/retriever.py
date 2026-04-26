@@ -145,6 +145,7 @@ def retrieve_for_incident(
     top_k: int = 5,
     affected_systems: list[str] = None,
     use_hybrid: bool = True,
+    use_filtering: bool = True,
 ) -> dict:
     """
     Retrieve relevant context for an incident.
@@ -156,10 +157,18 @@ def retrieve_for_incident(
         top_k: Number of results to return per corpus type
         affected_systems: List of affected system names from IncidentReport
         use_hybrid: Whether to use hybrid search (default True)
+    
+    Filtering strategy:
+        - Apply team filter only when affected_systems is confident
+        (multiple systems pointing to same team)
+        - Skip incident_family filter — too narrow on small corpus
+        - Always apply doc_type filter (runbook vs incident_report)
     """
     filters = {}
-    if affected_systems:
+    if use_filtering and affected_systems and len(affected_systems) >= 2:
         filters = infer_metadata_filters(affected_systems)
+        # Only use team filter, skip incident_family on small corpus
+        filters["incident_family"] = None
 
     runbooks = retrieve(
         query=incident_description,
