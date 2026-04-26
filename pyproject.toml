@@ -5,27 +5,38 @@ description = "Agentic incident triage pipeline for retail supply chain operatio
 requires-python = ">=3.11"
 dependencies = [
     # LLM and structured outputs
-    "instructor",
-    "google-generativeai",
+    "instructor>=1.15.1,<2.0.0",
+    "google-genai>=1.69.0",           # new SDK — replaces google-generativeai
     "pydantic>=2.0",
     "python-dotenv",
+    "jsonref",                         # required by instructor with genai
+
+    # Remove or comment out google-generativeai
+    # "google-generativeai",           # deprecated, replaced by google-genai
+
     # Vector store and database
     "pgvector",
     "psycopg2-binary",
     "sqlalchemy",
+
     # Embeddings and retrieval
     "sentence-transformers>=2.2.0,<3.0.0",
     "torch>=2.0.0,<2.4.0",
     "langchain-community",
     "langchain-core",
+
     # Agent orchestration (Week 6)
     "langgraph",
+
     # Observability (Week 8)
     "langfuse",
+
     # Evals (Week 10)
     "ragas",
+
     # Cost optimization and model routing (Week 12)
     "litellm",
+
     # API layer (Week 14)
     "fastapi",
     "uvicorn",
