@@ -612,6 +612,34 @@ queries, enables domain-aware routing in LangGraph agent.
 
 ---
 
+### Iteration 5.10 — Metadata Filtering Results and Decision
+**Results:**
+Hybrid + filtering: Runbook P@1 85%, Incident P@1 95%, Both P@1 80%
+
+**Finding:** Filtering improved incident retrieval (+5%) but hurt runbook
+retrieval (-10%) on small corpus. Root cause: filtering reduces search
+space so within-team near-miss documents compete more aggressively.
+On large corpus (500+ docs) filtering would be unambiguously better.
+
+**Decision:** Do not apply metadata filtering at retrieval time on
+current corpus. Instead:
+- Pass metadata to LLM as context via retrieved chunk metadata fields
+- Use metadata for agent routing in LangGraph (Week 6) not retrieval
+- Re-enable retrieval filtering when corpus reaches 100+ documents
+
+**Production configuration locked:**
+- Hybrid search: ON
+- Metadata filtering at retrieval: OFF
+- Metadata as LLM context: ON
+- Metadata for agent routing: ON (Week 6)
+
+**Can explore later:**
+- Selective filtering (team only, not incident_family, only when 2+
+  systems confirm same team)
+- Filtering re-enabled after corpus expansion to 100+ documents
+
+---
+
 ## Decisions Locked
 
 These decisions were made deliberately and should not be revisited
