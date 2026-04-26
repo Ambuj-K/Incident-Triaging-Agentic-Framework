@@ -640,6 +640,184 @@ current corpus. Instead:
 
 ---
 
+## Phase 6 — Retrieval Integration and Two-Pass Pipeline (Week 5)
+
+### Overview
+Wired the retrieval layer into the LLM client to create a two-pass
+triage pipeline. Pass 1 classifies the incident and identifies affected
+systems. Pass 2 retrieves relevant context and produces a grounded
+investigation report with calibrated confidence.
+
+---
+
+### Iteration 6.1 — Two-Pass Pipeline Architecture
+**Design decision:** Two LLM calls per investigation, not one.
+
+**Rationale:**
+Single pass with retrieval requires knowing which systems are affected
+before retrieval, but you need the LLM to identify affected systems.
+Chicken-and-egg problem. Two passes solve it cleanly:
+
+Pass 1 — classify incident, identify affected_systems, get initial
+confidence (expected low: 0.3-0.5 with no context)
+
+Pass 2 — use affected_systems to retrieve relevant runbooks and past
+incidents, re-investigate with context, get grounded confidence
+(expected high: 0.7-0.95 when relevant context found)
+
+**Cost implication:** Two LLM calls per investigation doubles token
+cost vs single pass. Justified because Pass 1 uses cheap model
+(Gemini Flash) and Pass 2 produces significantly higher quality output.
+Cost optimization layer in Week 12 will route simple incidents to
+single pass only.
+
+**Lesson:** The two-pass pattern is a standard agentic design for
+situations where you need model output to inform retrieval parameters.
+It trades latency and cost for quality and groundedness.
+
+---
+
+### Iteration 6.2 — Context Formatting for Pass 2
+**Problem:** Retrieved chunks are raw text snippets. Passing them
+directly to the LLM produces noisy, hard-to-reason context.
+
+**Fix:** `format_context` function structures retrieved chunks into
+clearly labeled sections with doc_id, team, and section metadata:
+RELEVANT RUNBOOKS
+Runbook 1: RUNBOOK-001 (Team: platform_engineering, Section: trigger conditions)
+[content truncated to 800 chars]
+RELEVANT PAST INCIDENTS
+Past Incident 1: INCIDENT-001 (Team: platform_engineering, Section: incident summary)
+[content truncated to 800 chars]
+
+**Why 800 char truncation:** Each chunk averages 400-600 words.
+3 runbooks + 3 incidents at full length would exceed practical context
+window budget. 800 chars preserves the most critical content (first
+part of each section) while keeping total context under 5000 tokens.
+
+**Lesson:** Context formatting is as important as retrieval quality.
+Poorly formatted context produces poor reasoning even when the right
+documents are retrieved.
+
+---
+
+### Iteration 6.3 — Confidence Calibration Validation
+**Test results on three incidents:**
+Incident                          Pass 1    Pass 2    Delta
+Inventory sync (in corpus)        0.45  →   0.95     +0.50
+ML forecasting (in corpus)        0.40  →   0.95     +0.55
+Stripe 402s (not in corpus)       0.40  →   0.10     -0.30
+
+**Finding:** The model correctly evaluates whether retrieved context
+is relevant to the specific incident. When context matches (inventory
+sync, ML forecasting) confidence jumps to 0.95. When context is
+irrelevant (Stripe — retrieved promotional demand and POS feed runbooks)
+confidence drops to 0.10.
+
+**This is the most important validation of the pipeline.** The system
+is not blindly trusting retrieved context. It is evaluating applicability
+and calibrating confidence accordingly. This is production-grade
+epistemic behavior.
+
+**The confidence delta is the key interview metric:**
+- Large positive delta: relevant context found, investigation grounded
+- Near-zero delta: context marginally relevant, moderate confidence
+- Negative delta: context irrelevant, model correctly distrusts retrieval
+
+---
+
+### Iteration 6.4 — Immediate Actions Quality Improvement
+**Before context (Pass 1):**
+Generic actions applicable to any incident of that type.
+Example inventory sync: "Check inventory sync job logs",
+"Notify supply chain teams", "Assess scope of discrepancies"
+
+**After context (Pass 2):**
+Specific actions derived from retrieved runbook content.
+Example inventory sync: "Investigate inventory sync job logs focusing
+on database connectivity", "Restart relevant database connection pools
+if exhaustion is suspected", "Re-trigger inventory sync job after
+initial mitigation"
+
+**The specificity improvement is directly attributable to RUNBOOK-001
+diagnostic and resolution steps being in the retrieved context.**
+This is the value of institutional knowledge retrieval — not just
+finding the right document but extracting actionable guidance from it.
+
+---
+
+### Iteration 6.5 — Dependency Resolution Issues
+**Issues encountered during Week 5 implementation:**
+
+google-generativeai vs google-genai conflict:
+- Both SDKs install into the google namespace causing ImportError
+- Fix: uninstall google-generativeai, use google-genai exclusively
+- Root cause: two packages competing for same Python namespace
+
+instructor.from_gemini → instructor.from_genai:
+- instructor 1.15.1 changed public API method name
+- Fix: update all references to from_genai
+
+instructor.Mode.GEMINI_JSON → Mode.GENAI_STRUCTURED_OUTPUTS:
+- Mode enum values changed with new genai SDK support
+- Fix: update mode to GENAI_STRUCTURED_OUTPUTS
+
+jsonref missing:
+- instructor requires jsonref for schema handling with genai SDK
+- Not declared as dependency in instructor package
+- Fix: uv add jsonref
+
+FutureWarning from instructor internals:
+- instructor/providers/gemini/client.py still imports google.generativeai
+- This is instructor's internal issue, not user code
+- Fix: suppress warning, track instructor issue for future resolution
+
+**Lesson:** Dependency management in the LLM ecosystem is volatile.
+Pin specific versions, document every dependency change, suppress
+known third-party warnings rather than letting them pollute output.
+
+**pyproject.toml additions:**
+```toml
+"google-genai>=1.69.0",
+"instructor>=1.15.1,<2.0.0",
+"jsonref",
+```
+
+---
+
+### Iteration 6.6 — Known Gap: Stripe and Payment Systems
+**Finding:** Stripe 402 incident retrieved completely irrelevant
+runbooks (promotional demand, POS feed, regional demand anomaly).
+Retrieval returned 0.10 confidence in final report — correct behavior
+but wasted compute.
+
+**Root cause:** Payment processing systems not in corpus.
+SYSTEM_TO_METADATA mapping has no entry for Stripe or payment
+processing, so no metadata filter applied and vector search returns
+best available match across all teams.
+
+**Mitigation in place:** Model correctly detects irrelevant context
+and drops system_specific_confidence to 0.10. Downstream routing
+logic can use this as escalation signal.
+
+**Can explore later:**
+- Add payment processing runbooks to corpus
+- Add Stripe to SYSTEM_TO_METADATA with appropriate team mapping
+- Implement retrieval skip logic when affected_systems contains
+  no known system mappings (avoid wasted LLM context budget)
+
+---
+
+### Phase 6 Decisions Locked
+- Two-pass pipeline is the production architecture
+- Context truncated to 800 chars per chunk, top 3 per corpus type
+- Confidence delta between passes is primary quality signal
+- Irrelevant context correctly detected and reflected in low confidence
+- google-genai is the sole Google AI SDK in this project
+- instructor pinned at >=1.15.1,<2.0.0
+
+---
+
 ## Decisions Locked
 
 These decisions were made deliberately and should not be revisited
@@ -659,3 +837,28 @@ without a specific measurable reason:
    add abbreviated, add adversarial — reveals failure modes systematically
 11. **RRF for hybrid fusion** — no weight tuning, robust combination
     of semantic and keyword signals
+12. **Corpus expansion deferred** — 30 documents sufficient for agent
+    layer demonstration. Hybrid search and corpus expansion marked as
+    known improvement path, not pursued in favor of agent development.
+13. **Two-pass triage pipeline** — Pass 1 classifies and identifies
+    affected systems, Pass 2 retrieves context and produces grounded
+    report. Confidence delta between passes is primary quality signal.
+14. **Context truncation at 800 chars per chunk** — balances content
+    quality against context window budget
+15. **google-genai is sole Google AI SDK** — google-generativeai
+    removed, namespace conflict resolved
+16. **Retrieval skip not implemented** — model correctly handles
+    irrelevant context by dropping confidence, skip logic deferred
+    to corpus expansion phase
+17. **Metadata filtering deferred at retrieval time** — corpus too small,
+    filtering degrades runbook P@1. Metadata used for agent routing in
+    LangGraph instead. Re-enable after corpus reaches 100+ documents.
+18. **OR logic for keyword search** — plainto_tsquery AND logic returned
+    zero results on technical queries. to_tsquery with pipe operators
+    surfaces partial term matches correctly.
+19. **Technical term detection activates keyword boost** — keyword search
+    only runs when query contains acronyms, error codes, or metric values.
+    Pure vector search for natural language queries avoids BM25 noise.
+20. **Targeted corpus addition over algorithm refinement** — added errno 28
+    and MAPE threshold language to specific documents rather than expanding
+    corpus broadly. Improved incident P@1 from 85% to 90%.
