@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from incident_triage.retrieval.retriever import retrieve_for_incident
 from incident_triage.retrieval.hybrid_search import hybrid_retrieve_for_incident
+from incident_triage.retrieval.hybrid_search import hybrid_search
 
 
 @dataclass
@@ -316,7 +317,6 @@ def evaluate_filtered_retrieval(
         )
 
         # Override with ground truth filters for eval
-        from incident_triage.retrieval.hybrid_search import hybrid_search
         runbooks = hybrid_search(
             query=case.query,
             doc_type="runbook",
