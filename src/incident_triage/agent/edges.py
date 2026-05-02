@@ -71,5 +71,13 @@ def route_after_investigation(state: AgentState) -> str:
         if report.system_specific_confidence >= 0.6:
             return "auto_resolve"
 
-    # Default to human review when uncertain
+    # Auto-resolve: low severity, not escalating, no flags raised
+    if report.severity in (Severity.LOW, Severity.MEDIUM):
+        if not report.escalate:
+            if not report.contradiction_detected:
+                if not report.insufficient_context:
+                    # Lower confidence threshold for low severity
+                    if report.system_specific_confidence >= 0.3:
+                        return "auto_resolve"
+
     return "human_review"
