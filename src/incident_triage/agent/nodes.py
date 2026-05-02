@@ -151,7 +151,7 @@ def investigate_with_context(state: AgentState) -> dict:
             # After getting final_report, determine review reason
         review_reason = ""
         if final_report.escalate:
-            review_reason = f"Severity {final_report.severity} requires escalation"
+            review_reason = f"Severity {final_report.severity.value} requires escalation"
         elif final_report.system_specific_confidence < 0.4:
             review_reason = f"Low confidence ({final_report.system_specific_confidence}) — insufficient context"
         elif final_report.contradiction_detected:
