@@ -1,6 +1,6 @@
 from incident_triage.agent.graph import build_graph
 from incident_triage.agent.state import AgentState
-import json
+import time
 
 # Build graph without interrupts for automated testing
 graph = build_graph(interrupt_on_human_review=False)
@@ -56,3 +56,4 @@ for case in test_cases:
         print(f"Error: {final_state['error_message']}")
 
     print()
+    time.sleep(15)
