@@ -61,6 +61,6 @@ class IncidentReport(BaseModel):
     @field_validator("affected_systems")
     @classmethod
     def no_empty_systems(cls, v):
-        if not v:
-            raise ValueError("affected_systems cannot be empty")
-        return v
+        # Allow empty list — model may genuinely not know affected systems
+        # insufficient_context flag handles this case
+        return v if v else ["unknown"]
