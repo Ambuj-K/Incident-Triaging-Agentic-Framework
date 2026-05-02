@@ -26,6 +26,7 @@ class AgentState(BaseModel):
     retrieval_attempted: bool = False
 
     # Pass 2 output
+    consistency_flags: list[str] = []
     final_report: Optional[IncidentReport] = None
 
     # Routing signals
