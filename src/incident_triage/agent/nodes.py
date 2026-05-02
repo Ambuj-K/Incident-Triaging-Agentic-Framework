@@ -148,8 +148,20 @@ def investigate_with_context(state: AgentState) -> dict:
             context=context,
         )
 
+            # After getting final_report, determine review reason
+        review_reason = ""
+        if final_report.escalate:
+            review_reason = f"Severity {final_report.severity} requires escalation"
+        elif final_report.system_specific_confidence < 0.4:
+            review_reason = f"Low confidence ({final_report.system_specific_confidence}) — insufficient context"
+        elif final_report.contradiction_detected:
+            review_reason = "Contradictory information in incident description"
+        elif final_report.insufficient_context:
+            review_reason = "Insufficient context for reliable triage"
+
         return {
             "final_report": final_report,
+            "human_review_reason": review_reason,
             "steps_taken": state.steps_taken + [
                 f"investigate_with_context: severity={final_report.severity}, "
                 f"confidence={final_report.system_specific_confidence}, "
