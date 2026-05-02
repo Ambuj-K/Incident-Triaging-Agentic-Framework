@@ -38,6 +38,34 @@ def format_context(retrieval_results: dict) -> str:
 
     return "\n".join(context_parts)
 
+# After Pass 2, if severity or affected_systems changed significantly
+# between Pass 1 and Pass 2, flag it for review
+
+def check_report_consistency(
+    initial: IncidentReport,
+    final: IncidentReport,
+) -> dict:
+    flags = []
+
+    # Severity escalated between passes — context revealed worse situation
+    if final.severity == Severity.CRITICAL and initial.severity != Severity.CRITICAL:
+        flags.append("severity_escalated_with_context")
+
+    # Affected systems changed significantly
+    initial_systems = set(initial.affected_systems)
+    final_systems = set(final.affected_systems)
+    if len(final_systems - initial_systems) > 2:
+        flags.append("affected_systems_significantly_changed")
+
+    # Confidence dropped despite having context
+    if final.system_specific_confidence < initial.system_specific_confidence:
+        flags.append("confidence_dropped_with_context")
+
+    return {
+        "consistency_flags": flags,
+        "requires_review": len(flags) > 0,
+    }
+
 
 class TriagePipeline:
     """
@@ -117,6 +145,8 @@ class TriagePipeline:
             context=context,
         )
 
+        consistency = check_report_consistency(initial_report, final_report)
+
         if verbose:
             print(f"  Severity: {final_report.severity}")
             print(f"  system_specific_confidence: "
@@ -128,4 +158,5 @@ class TriagePipeline:
             "retrieved_context": retrieval_results,
             "final_report": final_report,
             "context_used": context,
+            "consistency_flags": consistency,
         }
