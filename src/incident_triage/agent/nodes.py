@@ -1,7 +1,7 @@
 from incident_triage.agent.state import AgentState
 from incident_triage.clients.llm_client import LLMClient
 from incident_triage.retrieval.retriever import retrieve_for_incident
-from incident_triage.pipeline.triage_pipeline import format_context check_report_consistency
+from incident_triage.pipeline.triage_pipeline import format_context, check_report_consistency
 from incident_triage.config.llm_config import DEFAULT_CONFIG
 
 
