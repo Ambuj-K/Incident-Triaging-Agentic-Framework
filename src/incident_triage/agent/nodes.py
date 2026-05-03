@@ -81,6 +81,55 @@ def classify_incident(state: AgentState) -> dict:
         }
 
 
+def retrieve_context(state: AgentState) -> dict:
+    """
+    Node 4 — Retrieve relevant runbooks and past incidents.
+    Uses affected_systems from initial_report to guide retrieval.
+    """
+    if state.error_occurred or state.initial_report is None:
+        return {
+            "retrieval_attempted": False,
+            "steps_taken": state.steps_taken + ["retrieve_context: skipped - no initial report"],
+        }
+
+    try:
+        affected_systems = [
+            s.lower().replace(" ", "_").replace("-", "_")
+            for s in state.initial_report.affected_systems
+        ]
+
+        results = retrieve_for_incident(
+            incident_description=state.incident_description,
+            top_k=3,
+            affected_systems=affected_systems,
+            use_hybrid=True,
+        )
+
+        runbooks = results.get("runbooks", [])
+        incidents = results.get("past_incidents", [])
+        context = format_context(results)
+
+        return {
+            "retrieved_runbooks": runbooks,
+            "retrieved_incidents": incidents,
+            "context_formatted": context,
+            "retrieval_attempted": True,
+            "steps_taken": state.steps_taken + [
+                f"retrieve_context: {len(runbooks)} runbooks, "
+                f"{len(incidents)} incidents"
+            ],
+        }
+
+    except Exception as e:
+        return {
+            "retrieval_attempted": True,
+            "context_formatted": "Retrieval failed — proceeding without context.",
+            "error_occurred": True,
+            "error_message": f"Retrieval failed: {str(e)}",
+            "steps_taken": state.steps_taken + [f"retrieve_context: error - {str(e)}"],
+        }
+
+
 def investigate_with_context(state: AgentState) -> dict:
     """
     Node 5 — Pass 2 LLM call.
