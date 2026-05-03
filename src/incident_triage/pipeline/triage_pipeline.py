@@ -45,21 +45,49 @@ def check_report_consistency(
     initial: IncidentReport,
     final: IncidentReport,
 ) -> dict:
+    """
+    Compare Pass 1 and Pass 2 reports for significant discrepancies.
+    Flags cases where retrieved context substantially changed the
+    agent's understanding — these warrant human review.
+    """
     flags = []
 
-    # Severity escalated between passes — context revealed worse situation
-    if final.severity == Severity.CRITICAL and initial.severity != Severity.CRITICAL:
-        flags.append("severity_escalated_with_context")
+    # Severity escalated between passes
+    severity_order = ["low", "medium", "high", "critical"]
+    initial_idx = severity_order.index(initial.severity.value)
+    final_idx = severity_order.index(final.severity.value)
+
+    if final_idx > initial_idx + 1:
+        flags.append(
+            f"severity_escalated_with_context: "
+            f"{initial.severity.value} → {final.severity.value}"
+        )
 
     # Affected systems changed significantly
-    initial_systems = set(initial.affected_systems)
-    final_systems = set(final.affected_systems)
-    if len(final_systems - initial_systems) > 2:
-        flags.append("affected_systems_significantly_changed")
+    initial_systems = set(s.lower() for s in initial.affected_systems)
+    final_systems = set(s.lower() for s in final.affected_systems)
+    new_systems = final_systems - initial_systems
+
+    if len(new_systems) > 2:
+        flags.append(
+            f"affected_systems_significantly_changed: "
+            f"{len(new_systems)} new systems identified with context"
+        )
 
     # Confidence dropped despite having context
-    if final.system_specific_confidence < initial.system_specific_confidence:
-        flags.append("confidence_dropped_with_context")
+    if final.system_specific_confidence < initial.system_specific_confidence - 0.1:
+        flags.append(
+            f"confidence_dropped_with_context: "
+            f"{initial.system_specific_confidence} → "
+            f"{final.system_specific_confidence}"
+        )
+
+    # Escalation status flipped
+    if initial.escalate != final.escalate:
+        flags.append(
+            f"escalation_flipped: "
+            f"{initial.escalate} → {final.escalate}"
+        )
 
     return {
         "consistency_flags": flags,
@@ -145,18 +173,17 @@ class TriagePipeline:
             context=context,
         )
 
+        # Consistency check between Pass 1 and Pass 2
         consistency = check_report_consistency(initial_report, final_report)
 
-        if verbose:
-            print(f"  Severity: {final_report.severity}")
-            print(f"  system_specific_confidence: "
-                  f"{final_report.system_specific_confidence}")
-            print(f"  Escalate: {final_report.escalate}")
+        if verbose and consistency["consistency_flags"]:
+            print(f"\n[Consistency] Flags raised: {consistency['consistency_flags']}")
 
         return {
             "initial_report": initial_report,
             "retrieved_context": retrieval_results,
             "final_report": final_report,
             "context_used": context,
-            "consistency_flags": consistency,
+            "consistency_flags": consistency["consistency_flags"],
+            "requires_review": consistency["requires_review"],
         }
