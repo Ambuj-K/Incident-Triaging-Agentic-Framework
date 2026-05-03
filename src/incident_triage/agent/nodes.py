@@ -1,7 +1,7 @@
 from incident_triage.agent.state import AgentState
 from incident_triage.clients.llm_client import LLMClient
 from incident_triage.retrieval.retriever import retrieve_for_incident
-from incident_triage.pipeline.triage_pipeline import format_context
+from incident_triage.pipeline.triage_pipeline import format_context check_report_consistency
 from incident_triage.config.llm_config import DEFAULT_CONFIG
 
 
@@ -81,55 +81,6 @@ def classify_incident(state: AgentState) -> dict:
         }
 
 
-def retrieve_context(state: AgentState) -> dict:
-    """
-    Node 4 — Retrieve relevant runbooks and past incidents.
-    Uses affected_systems from initial_report to guide retrieval.
-    """
-    if state.error_occurred or state.initial_report is None:
-        return {
-            "retrieval_attempted": False,
-            "steps_taken": state.steps_taken + ["retrieve_context: skipped - no initial report"],
-        }
-
-    try:
-        affected_systems = [
-            s.lower().replace(" ", "_").replace("-", "_")
-            for s in state.initial_report.affected_systems
-        ]
-
-        results = retrieve_for_incident(
-            incident_description=state.incident_description,
-            top_k=3,
-            affected_systems=affected_systems,
-            use_hybrid=True,
-        )
-
-        runbooks = results.get("runbooks", [])
-        incidents = results.get("past_incidents", [])
-        context = format_context(results)
-
-        return {
-            "retrieved_runbooks": runbooks,
-            "retrieved_incidents": incidents,
-            "context_formatted": context,
-            "retrieval_attempted": True,
-            "steps_taken": state.steps_taken + [
-                f"retrieve_context: {len(runbooks)} runbooks, "
-                f"{len(incidents)} incidents"
-            ],
-        }
-
-    except Exception as e:
-        return {
-            "retrieval_attempted": True,
-            "context_formatted": "Retrieval failed — proceeding without context.",
-            "error_occurred": True,
-            "error_message": f"Retrieval failed: {str(e)}",
-            "steps_taken": state.steps_taken + [f"retrieve_context: error - {str(e)}"],
-        }
-
-
 def investigate_with_context(state: AgentState) -> dict:
     """
     Node 5 — Pass 2 LLM call.
@@ -148,9 +99,17 @@ def investigate_with_context(state: AgentState) -> dict:
             context=context,
         )
 
-            # After getting final_report, determine review reason
+        # Consistency check between Pass 1 and Pass 2
+        consistency = check_report_consistency(
+            state.initial_report,
+            final_report,
+        )
+
+        # Determine human review reason
         review_reason = ""
-        if final_report.escalate:
+        if consistency["requires_review"]:
+            review_reason = f"Consistency flags: {', '.join(consistency['consistency_flags'])}"
+        elif final_report.escalate:
             review_reason = f"Severity {final_report.severity.value} requires escalation"
         elif final_report.system_specific_confidence < 0.4:
             review_reason = f"Low confidence ({final_report.system_specific_confidence}) — insufficient context"
@@ -161,16 +120,17 @@ def investigate_with_context(state: AgentState) -> dict:
 
         return {
             "final_report": final_report,
+            "consistency_flags": consistency["consistency_flags"],
             "human_review_reason": review_reason,
             "steps_taken": state.steps_taken + [
-                f"investigate_with_context: severity={final_report.severity}, "
+                f"investigate_with_context: severity={final_report.severity.value}, "
                 f"confidence={final_report.system_specific_confidence}, "
-                f"escalate={final_report.escalate}"
+                f"escalate={final_report.escalate}, "
+                f"consistency_flags={len(consistency['consistency_flags'])}"
             ],
         }
 
     except Exception as e:
-        # Fall back to initial report if Pass 2 fails
         return {
             "final_report": state.initial_report,
             "error_occurred": True,
