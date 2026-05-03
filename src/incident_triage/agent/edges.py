@@ -30,18 +30,18 @@ def route_after_investigation(state: AgentState) -> str:
     After Pass 2 investigation — the core routing decision.
 
     Routes to human_review when:
-    - Final report requires escalation
-    - System specific confidence is low (< 0.4) — model not confident
-    - Complexity is complex — novel situation needs human judgment
-    - Contradiction detected — conflicting information
-    - Insufficient context — not enough info to triage reliably
     - Error occurred during investigation
+    - Consistency flags raised between Pass 1 and Pass 2
+    - Final report requires escalation
+    - system_specific_confidence < 0.4
+    - Complexity is complex
+    - Contradiction detected
+    - Insufficient context
 
     Routes to auto_resolve when:
-    - Low severity (low/medium)
-    - High confidence (>= 0.6)
-    - Simple or medium complexity
-    - No flags raised
+    - Severity is low or medium
+    - system_specific_confidence >= 0.3
+    - No escalation, contradiction, or context flags raised
     """
     if state.error_occurred:
         return "human_review"
@@ -50,7 +50,9 @@ def route_after_investigation(state: AgentState) -> str:
     if report is None:
         return "human_review"
 
-    # Escalation triggers → human review
+    if state.consistency_flags:
+        return "human_review"
+
     if report.escalate:
         return "human_review"
 
@@ -68,16 +70,7 @@ def route_after_investigation(state: AgentState) -> str:
 
     # Safe to auto-resolve
     if report.severity in (Severity.LOW, Severity.MEDIUM):
-        if report.system_specific_confidence >= 0.6:
+        if report.system_specific_confidence >= 0.3:
             return "auto_resolve"
-
-    # Auto-resolve: low severity, not escalating, no flags raised
-    if report.severity in (Severity.LOW, Severity.MEDIUM):
-        if not report.escalate:
-            if not report.contradiction_detected:
-                if not report.insufficient_context:
-                    # Lower confidence threshold for low severity
-                    if report.system_specific_confidence >= 0.3:
-                        return "auto_resolve"
 
     return "human_review"
