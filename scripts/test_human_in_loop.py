@@ -1,5 +1,9 @@
-import os
-os.environ["LANGGRAPH_STRICT_MSGPACK"] = "false"
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message=".*Deserializing unregistered type.*",
+    category=UserWarning,
+)
 
 from incident_triage.agent.graph import build_graph
 from incident_triage.agent.state import AgentState
