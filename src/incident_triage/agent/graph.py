@@ -1,3 +1,6 @@
+import os
+os.environ["LANGGRAPH_STRICT_MSGPACK"] = "false"
+
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -16,7 +19,6 @@ from incident_triage.agent.edges import (
     route_after_classification,
     route_after_investigation,
 )
-
 
 def build_graph(interrupt_on_human_review: bool = True):
     """

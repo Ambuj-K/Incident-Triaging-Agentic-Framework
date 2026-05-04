@@ -43,6 +43,9 @@ graph.update_state(
         "final_report": updated_report,
         "human_review_reason": "Reviewed — confirmed critical, affecting peak trading window",
         "requires_human_review": True,
+        "steps_taken": result["steps_taken"] + [
+            "human_review: completed by human — severity escalated to critical"
+        ],
     },
     as_node="human_review",
 )
