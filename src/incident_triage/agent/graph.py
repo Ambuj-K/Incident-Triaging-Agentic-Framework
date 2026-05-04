@@ -1,6 +1,3 @@
-import os
-os.environ["LANGGRAPH_STRICT_MSGPACK"] = "false"
-
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
