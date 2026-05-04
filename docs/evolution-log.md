@@ -818,6 +818,200 @@ logic can use this as escalation signal.
 
 ---
 
+## Phase 7 — LangGraph Agent Build (Weeks 6-7)
+
+### Overview
+Built a stateful agentic investigation pipeline using LangGraph.
+The pipeline transforms the linear two-pass triage script into a
+graph with conditional routing, human-in-the-loop interrupts,
+state persistence, and a complete audit trail.
+
+---
+
+### Iteration 7.1 — Agent Architecture Decision
+**Decision:** Seven-node graph with conditional routing.
+
+**Nodes:**
+- validate_input: security layer, catches empty/short/long input
+- request_clarification: terminal node for invalid input
+- classify_incident: Pass 1 LLM call, identifies affected_systems
+- retrieve_context: hybrid retrieval using affected_systems
+- investigate_with_context: Pass 2 LLM call with retrieved context
+- human_review: interrupt point, waits for human input
+- auto_resolve: terminal node for low severity high confidence incidents
+
+**Key design decision:** Nodes never modify state directly.
+Each node returns a dict of state updates. LangGraph merges
+these into the shared AgentState. This makes every state
+transition explicit and traceable.
+
+---
+
+### Iteration 7.2 — AgentState Schema
+**Fields added progressively as each node's needs were identified:**
+
+Input: incident_description
+Validation: input_valid, validation_error
+Pass 1: initial_report
+Retrieval: retrieved_runbooks, retrieved_incidents,
+           context_formatted, retrieval_attempted
+Pass 2: final_report, consistency_flags
+Routing: requires_human_review, human_review_reason, auto_resolved
+Audit: steps_taken, error_occurred, error_message
+
+**Key insight:** Every routing signal is a typed field in state,
+not buried in prose. contradiction_detected, insufficient_context,
+consistency_flags, requires_human_review — all boolean or list
+fields that conditional edges read directly.
+
+---
+
+### Iteration 7.3 — Routing Logic Design
+**route_after_investigation checks in priority order:**
+
+1. error_occurred → human_review
+2. final_report is None → human_review
+3. consistency_flags non-empty → human_review
+4. report.escalate → human_review
+5. system_specific_confidence < 0.4 → human_review
+6. complexity == COMPLEX → human_review
+7. contradiction_detected → human_review
+8. insufficient_context → human_review
+9. severity LOW/MEDIUM + confidence >= 0.3 → auto_resolve
+10. default → human_review
+
+**Threshold decision:** Auto-resolve confidence threshold set at 0.3
+not 0.6. Dashboard incident (low severity, irrelevant retrieved context)
+produced confidence 0.3 — 0.6 threshold was too conservative for
+low-stakes incidents where context is not available in corpus.
+
+---
+
+### Iteration 7.4 — Consistency Checker Between Pass 1 and Pass 2
+**Problem:** Two-pass pipeline can produce significantly different
+reports between passes. Context can escalate severity, flip escalation
+decisions, or drop confidence. These discrepancies warrant human review
+regardless of the individual report flags.
+
+**Implementation:** check_report_consistency in triage_pipeline.py
+compares initial_report and final_report on four dimensions:
+- severity_escalated_with_context: severity jumped more than one level
+- affected_systems_significantly_changed: more than 2 new systems
+- confidence_dropped_with_context: confidence dropped by more than 0.1
+- escalation_flipped: escalate changed between passes
+
+**Observed in production:**
+- Inventory sync: consistency_flags=1, affected_systems grew from
+  Pass 1 to Pass 2 as context revealed additional downstream systems
+- Vague input: consistency_flags=2, confidence dropped 0.2→0.0
+  AND escalation flipped False→True as context made agent more cautious
+
+**Lesson:** Consistency flags are a more nuanced signal than individual
+report flags. They capture the delta between what the model thought
+before and after seeing institutional knowledge.
+
+---
+
+### Iteration 7.5 — human_review_reason Priority Order
+**Problem:** Multiple signals can trigger human review simultaneously.
+The reason shown to the human reviewer should reflect the most
+important signal.
+
+**Priority order implemented:**
+1. Consistency flags first — pipeline-level discrepancy
+2. Escalation — severity requires human judgment
+3. Low confidence — model not sure
+4. Contradiction — conflicting input
+5. Insufficient context — not enough information
+
+**Rationale:** Consistency flags are checked first because they
+indicate the agent itself changed its mind between passes — this
+is more important to surface to a human than individual flags
+that were present from the start.
+
+---
+
+### Iteration 7.6 — Human-in-the-Loop Implementation
+**Pattern used:** interrupt_before + update_state + invoke(None)
+
+Graph compiled with interrupt_before=["human_review"]. When
+human_review node is reached, graph serializes entire state to
+MemorySaver checkpoint and pauses.
+
+Human review process:
+1. Inspect final_report and human_review_reason
+2. Modify state — override severity, add actions, update reason
+3. Call graph.update_state(config, values, as_node="human_review")
+4. Call graph.invoke(None, config) to resume from checkpoint
+
+**Human can modify:**
+- severity (override to critical if warranted)
+- immediate_actions (replace with operationally specific steps)
+- human_review_reason (document rationale for escalation decision)
+
+**State after human review:**
+- Human modifications persist in final_report
+- steps_taken includes "human_review: completed by human" entry
+- requires_human_review: True signals downstream systems
+
+**Verified:** Severity correctly updated from high → critical.
+Human-modified actions correctly replace agent-generated actions.
+Complete audit trail preserved through checkpoint serialization.
+
+---
+
+### Iteration 7.7 — Dependency and API Issues Resolved
+**instructor.from_gemini → instructor.from_genai**
+Method name changed in instructor 1.15.1. Updated all references.
+
+**instructor.Mode.GEMINI_JSON → Mode.GENAI_STRUCTURED_OUTPUTS**
+Mode enum changed with new genai SDK support.
+
+**jsonref missing**
+instructor requires jsonref for schema handling. Added to dependencies.
+
+**google-generativeai namespace conflict**
+Both SDKs install into google namespace. Removed google-generativeai,
+using google-genai exclusively.
+
+**LangGraph msgpack serialization warnings**
+MemorySaver checkpoint serializer warns about unregistered custom
+Pydantic types (Severity, Complexity, IncidentReport). Functionality
+correct — warning is cosmetic. Suppressed with warnings.filterwarnings.
+Root cause: LangGraph does not yet provide a clean registration API
+for custom Pydantic types. Tracked in TODO.md.
+
+---
+
+### Iteration 7.8 — auto_resolve validator fix
+**Problem:** Vague input "something seems wrong" caused model to return
+affected_systems=[] — empty list. Pydantic validator no_empty_systems
+raised ValueError and Instructor exhausted all retries.
+
+**Fix:** Updated validator to substitute "unknown" instead of failing:
+```python
+@field_validator("affected_systems")
+@classmethod
+def no_empty_systems(cls, v):
+    return v if v else ["unknown"]
+```
+
+**Rationale:** Model is correct that it cannot identify specific systems
+from vague input. Substituting "unknown" allows the pipeline to continue.
+insufficient_context=True in the report signals the agent to route to
+human_review regardless, so the routing outcome is unchanged.
+
+---
+
+### Phase 7 Decisions Locked
+- Seven-node graph with conditional routing is the production architecture
+- Nodes return state update dicts, never modify state directly
+- Consistency checker runs after Pass 2, before routing
+- Consistency flags take priority over individual report flags in human_review_reason
+- Auto-resolve threshold: severity LOW/MEDIUM + confidence >= 0.3 + no flags
+- Human-in-the-loop via interrupt_before + update_state + invoke(None)
+- affected_systems=[] substituted with "unknown" rather than failing validation
+
 ## Decisions Locked
 
 These decisions were made deliberately and should not be revisited
@@ -862,6 +1056,19 @@ without a specific measurable reason:
 20. **Targeted corpus addition over algorithm refinement** — added errno 28
     and MAPE threshold language to specific documents rather than expanding
     corpus broadly. Improved incident P@1 from 85% to 90%.
+21. **Seven-node LangGraph graph** — validate, clarify, classify,
+    retrieve, investigate, human_review, auto_resolve
+22. **Nodes return state dicts not modify state directly** — every
+    transition explicit and traceable
+23. **Consistency checker between passes** — four signals: severity
+    escalation, system count change, confidence drop, escalation flip
+24. **Auto-resolve threshold 0.3** — lower than initial 0.6, calibrated
+    against dashboard incident with irrelevant retrieved context
+25. **Human-in-the-loop via update_state + invoke(None)** — not Command,
+    update_state is correct pattern for LangGraph 1.1.8
+26. **affected_systems empty → substitute unknown** — validation
+    allows pipeline to continue, insufficient_context routes to human
+
 
                     ┌─────────────────┐
                     │   START         │
