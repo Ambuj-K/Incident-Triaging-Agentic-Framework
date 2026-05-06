@@ -55,15 +55,24 @@ def request_clarification(state: AgentState) -> dict:
 
 
 def classify_incident(state: AgentState) -> dict:
-    """
-    Node 3 — Pass 1 LLM call.
-    Classify incident and identify affected systems.
-    No retrieval context yet — builds the retrieval query.
-    """
+    """Node 3 — Pass 1 LLM call."""
+    lf = get_langfuse()
+
+    span = lf.span(
+        name="classify_incident",
+        input={"incident": state.incident_description},
+    )
+
     try:
         initial_report = llm_client.triage_incident(
             state.incident_description
         )
+
+        span.end(output={
+            "severity": initial_report.severity.value,
+            "affected_systems": initial_report.affected_systems,
+            "confidence": initial_report.system_specific_confidence,
+        })
 
         return {
             "initial_report": initial_report,
@@ -74,10 +83,13 @@ def classify_incident(state: AgentState) -> dict:
         }
 
     except Exception as e:
+        span.end(output={"error": str(e)}, level="ERROR")
         return {
             "error_occurred": True,
             "error_message": f"Classification failed: {str(e)}",
-            "steps_taken": state.steps_taken + [f"classify_incident: error - {str(e)}"],
+            "steps_taken": state.steps_taken + [
+                f"classify_incident: error - {str(e)}"
+            ],
         }
 
 
