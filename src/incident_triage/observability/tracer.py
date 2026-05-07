@@ -15,13 +15,3 @@ def get_langfuse() -> Langfuse:
             host=os.environ["LANGFUSE_HOST"],
         )
     return _langfuse
-
-
-def create_trace(name: str, input_data: dict, metadata: dict = None):
-    """Create a new Langfuse trace for an investigation."""
-    lf = get_langfuse()
-    return lf.trace(
-        name=name,
-        input=input_data,
-        metadata=metadata or {},
-    )
