@@ -3,6 +3,7 @@ from incident_triage.clients.llm_client import LLMClient
 from incident_triage.retrieval.retriever import retrieve_for_incident
 from incident_triage.pipeline.triage_pipeline import format_context, check_report_consistency
 from incident_triage.config.llm_config import DEFAULT_CONFIG
+from incident_triage.observability.tracer import get_langfuse
 
 
 llm_client = LLMClient(config=DEFAULT_CONFIG)
@@ -143,14 +144,24 @@ def retrieve_context(state: AgentState) -> dict:
 
 
 def investigate_with_context(state: AgentState) -> dict:
-    """
-    Node 5 — Pass 2 LLM call.
-    Produce grounded investigation report using retrieved context.
-    """
+    """Node 5 — Pass 2 LLM call."""
     if state.error_occurred and state.initial_report is None:
         return {
-            "steps_taken": state.steps_taken + ["investigate_with_context: skipped - error state"],
+            "steps_taken": state.steps_taken + [
+                "investigate_with_context: skipped - error state"
+            ],
         }
+
+    lf = get_langfuse()
+    span = lf.span(
+        name="investigate_with_context",
+        input={
+            "incident": state.incident_description[:200],
+            "context_length": len(state.context_formatted),
+            "runbooks_used": [r["doc_id"] for r in state.retrieved_runbooks],
+            "incidents_used": [i["doc_id"] for i in state.retrieved_incidents],
+        },
+    )
 
     try:
         context = state.context_formatted or "No relevant context found."
@@ -160,20 +171,39 @@ def investigate_with_context(state: AgentState) -> dict:
             context=context,
         )
 
-        # Consistency check between Pass 1 and Pass 2
         consistency = check_report_consistency(
             state.initial_report,
             final_report,
         )
 
-        # Determine human review reason
+        confidence_delta = (
+            final_report.system_specific_confidence
+            - state.initial_report.system_specific_confidence
+        )
+
+        span.end(output={
+            "severity": final_report.severity.value,
+            "confidence": final_report.system_specific_confidence,
+            "confidence_delta": confidence_delta,
+            "escalate": final_report.escalate,
+            "consistency_flags": consistency["consistency_flags"],
+        })
+
         review_reason = ""
         if consistency["requires_review"]:
-            review_reason = f"Consistency flags: {', '.join(consistency['consistency_flags'])}"
+            review_reason = (
+                f"Consistency flags: "
+                f"{', '.join(consistency['consistency_flags'])}"
+            )
         elif final_report.escalate:
-            review_reason = f"Severity {final_report.severity.value} requires escalation"
+            review_reason = (
+                f"Severity {final_report.severity.value} requires escalation"
+            )
         elif final_report.system_specific_confidence < 0.4:
-            review_reason = f"Low confidence ({final_report.system_specific_confidence}) — insufficient context"
+            review_reason = (
+                f"Low confidence ({final_report.system_specific_confidence})"
+                f" — insufficient context"
+            )
         elif final_report.contradiction_detected:
             review_reason = "Contradictory information in incident description"
         elif final_report.insufficient_context:
@@ -184,7 +214,8 @@ def investigate_with_context(state: AgentState) -> dict:
             "consistency_flags": consistency["consistency_flags"],
             "human_review_reason": review_reason,
             "steps_taken": state.steps_taken + [
-                f"investigate_with_context: severity={final_report.severity.value}, "
+                f"investigate_with_context: "
+                f"severity={final_report.severity.value}, "
                 f"confidence={final_report.system_specific_confidence}, "
                 f"escalate={final_report.escalate}, "
                 f"consistency_flags={len(consistency['consistency_flags'])}"
@@ -195,8 +226,12 @@ def investigate_with_context(state: AgentState) -> dict:
         return {
             "final_report": state.initial_report,
             "error_occurred": True,
-            "error_message": f"Investigation failed: {str(e)}, using initial report",
-            "steps_taken": state.steps_taken + [f"investigate_with_context: error - {str(e)}"],
+            "error_message": (
+                f"Investigation failed: {str(e)}, using initial report"
+            ),
+            "steps_taken": state.steps_taken + [
+                f"investigate_with_context: error - {str(e)}"
+            ],
         }
 
 
