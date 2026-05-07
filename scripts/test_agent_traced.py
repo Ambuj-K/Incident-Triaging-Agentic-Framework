@@ -1,15 +1,45 @@
 import warnings
-warnings.filterwarnings(
-    "ignore",
-    message=".*Deserializing unregistered type.*",
-)
+warnings.filterwarnings("ignore", message=".*Deserializing unregistered type.*")
 
+import os
+import time
+from dotenv import load_dotenv
+load_dotenv()
+
+os.environ["LANGFUSE_PUBLIC_KEY"] = os.environ["LANGFUSE_PUBLIC_KEY"]
+os.environ["LANGFUSE_SECRET_KEY"] = os.environ["LANGFUSE_SECRET_KEY"]
+os.environ["LANGFUSE_HOST"] = os.environ["LANGFUSE_HOST"]
+
+from langfuse import observe, langfuse_context
 from incident_triage.agent.graph import build_graph
 from incident_triage.agent.state import AgentState
-from incident_triage.observability.tracer import get_langfuse
 
 graph = build_graph(interrupt_on_human_review=False)
-lf = get_langfuse()
+
+
+@observe(name="incident_investigation")
+def run_investigation(incident: str, thread_id: str):
+    langfuse_context.update_current_trace(
+        input={"incident": incident},
+        metadata={"source": "test_script"},
+    )
+
+    config = {"configurable": {"thread_id": thread_id}}
+    initial_state = AgentState(incident_description=incident)
+    result = graph.invoke(initial_state, config=config)
+
+    if result.get("final_report"):
+        langfuse_context.update_current_trace(
+            output={
+                "severity": result["final_report"].severity.value,
+                "auto_resolved": result.get("auto_resolved", False),
+                "requires_human_review": result.get("requires_human_review", False),
+                "consistency_flags": result.get("consistency_flags", []),
+            }
+        )
+
+    return result
+
 
 test_incidents = [
     "Inventory sync job failed at 3am. 2400 SKUs showing incorrect stock levels across 3 regional DCs. Downstream replenishment orders blocked.",
@@ -17,44 +47,16 @@ test_incidents = [
     "One internal reporting dashboard loading slowly for a single analyst. No other users affected. No business critical data involved.",
 ]
 
-import time
-
 for incident in test_incidents:
     print(f"\nIncident: {incident[:60]}...")
-
-    # Create top-level trace for this investigation
-    trace = lf.trace(
-        name="incident_investigation",
-        input={"incident": incident},
-        metadata={"source": "test_script"},
+    result = run_investigation(
+        incident=incident,
+        thread_id=f"trace-test-{hash(incident)}",
     )
-
-    config = {
-        "configurable": {
-            "thread_id": f"trace-test-{hash(incident)}"
-        }
-    }
-
-    initial_state = AgentState(incident_description=incident)
-    result = graph.invoke(initial_state, config=config)
-
-    # Update trace with final outcome
-    trace.update(
-        output={
-            "severity": result["final_report"].severity.value if result.get("final_report") else "unknown",
-            "auto_resolved": result.get("auto_resolved", False),
-            "requires_human_review": result.get("requires_human_review", False),
-            "consistency_flags": result.get("consistency_flags", []),
-            "steps_taken": result.get("steps_taken", []),
-        }
-    )
-
-    print(f"  Severity: {result['final_report'].severity.value if result.get('final_report') else 'unknown'}")
-    print(f"  Auto resolved: {result.get('auto_resolved', False)}")
-    print(f"  Human review: {result.get('requires_human_review', False)}")
-    print(f"  Trace ID: {trace.id}")
-
-    lf.flush()
+    if result.get("final_report"):
+        print(f"  Severity: {result['final_report'].severity.value}")
+        print(f"  Auto resolved: {result.get('auto_resolved', False)}")
+        print(f"  Human review: {result.get('requires_human_review', False)}")
     time.sleep(15)
 
 print("\nCheck your Langfuse dashboard for traces.")
