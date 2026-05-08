@@ -6,20 +6,17 @@ import time
 from dotenv import load_dotenv
 load_dotenv()
 
-os.environ["LANGFUSE_PUBLIC_KEY"] = os.environ["LANGFUSE_PUBLIC_KEY"]
-os.environ["LANGFUSE_SECRET_KEY"] = os.environ["LANGFUSE_SECRET_KEY"]
-os.environ["LANGFUSE_HOST"] = os.environ["LANGFUSE_HOST"]
-
-from langfuse import observe, langfuse_context
+from langfuse import get_client, observe
 from incident_triage.agent.graph import build_graph
 from incident_triage.agent.state import AgentState
 
 graph = build_graph(interrupt_on_human_review=False)
+langfuse = get_client()
 
 
 @observe(name="incident_investigation")
-def run_investigation(incident: str, thread_id: str):
-    langfuse_context.update_current_trace(
+def run_investigation(incident: str, thread_id: str) -> dict:
+    langfuse.update_current_observation(
         input={"incident": incident},
         metadata={"source": "test_script"},
     )
@@ -29,12 +26,13 @@ def run_investigation(incident: str, thread_id: str):
     result = graph.invoke(initial_state, config=config)
 
     if result.get("final_report"):
-        langfuse_context.update_current_trace(
+        langfuse.update_current_observation(
             output={
                 "severity": result["final_report"].severity.value,
                 "auto_resolved": result.get("auto_resolved", False),
                 "requires_human_review": result.get("requires_human_review", False),
                 "consistency_flags": result.get("consistency_flags", []),
+                "steps_taken": result.get("steps_taken", []),
             }
         )
 
@@ -49,14 +47,19 @@ test_incidents = [
 
 for incident in test_incidents:
     print(f"\nIncident: {incident[:60]}...")
+
     result = run_investigation(
         incident=incident,
-        thread_id=f"trace-test-{hash(incident)}",
+        thread_id=f"trace-test-{abs(hash(incident))}",
     )
+
     if result.get("final_report"):
         print(f"  Severity: {result['final_report'].severity.value}")
         print(f"  Auto resolved: {result.get('auto_resolved', False)}")
         print(f"  Human review: {result.get('requires_human_review', False)}")
+        print(f"  Consistency flags: {result.get('consistency_flags', [])}")
+
     time.sleep(15)
 
-print("\nCheck your Langfuse dashboard for traces.")
+langfuse.flush()
+print("\nDone. Check Langfuse dashboard for traces.")
