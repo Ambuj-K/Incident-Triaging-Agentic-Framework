@@ -1012,6 +1012,82 @@ human_review regardless, so the routing outcome is unchanged.
 - Human-in-the-loop via interrupt_before + update_state + invoke(None)
 - affected_systems=[] substituted with "unknown" rather than failing validation
 
+
+## Phase 8 — Observability with Langfuse (Week 8)
+
+### Overview
+Wired Langfuse tracing into the agent pipeline. Every investigation
+produces a structured trace with nested spans for each node, capturing
+inputs, outputs, and latency at every step.
+
+---
+
+### Iteration 8.1 — Langfuse Version Compatibility
+**Problem:** Langfuse v4.3.1 released March 2026 is a major rewrite
+based on OpenTelemetry. v2/v3 APIs (lf.trace(), langfuse_context,
+update_current_trace) are deprecated or removed.
+
+**v4 correct API:**
+- get_client() — global client from environment variables
+- @observe() decorator — auto-creates spans, captures inputs/outputs
+- langfuse.update_current_span() — update active span within @observe
+- langfuse.flush() — flush buffer before script exits
+
+**Wrong APIs tried first:**
+- lf.trace() — AttributeError, removed in v4
+- langfuse_context.update_current_trace() — deprecated in v4
+- langfuse.update_current_observation() — does not exist in v4
+
+**Lesson:** Always fetch live SDK documentation before implementing
+observability. SDK APIs in the LLM ecosystem change faster than
+most other libraries.
+
+---
+
+### Iteration 8.2 — Trace Structure
+**Three nested spans per investigation:**
+incident_investigation    [root — @observe on run_investigation]
+├── classify_incident   [span — @observe on node function]
+├── retrieve_context    [span — @observe on node function]
+└── investigate_with_context [span — @observe on node function]
+
+**Each span captures:**
+- classify_incident: incident text, severity, affected_systems, confidence
+- retrieve_context: affected_systems, runbooks retrieved, incidents retrieved, top score
+- investigate_with_context: context_length, runbooks used, severity, confidence, confidence_delta, escalate, consistency_flags
+
+**Key metric visible in traces: confidence_delta**
+The delta between Pass 1 and Pass 2 confidence is the primary
+quality signal. Visible per investigation in Langfuse:
+- Inventory sync: 0.45 → 0.95 (+0.50) — relevant context found
+- ML forecast: 0.45 → high — relevant context found
+- Dashboard: 0.35 → 0.10 (-0.25) — irrelevant context detected
+
+---
+
+### Iteration 8.3 — Latency Observations
+**Neon cold start dominates retrieval latency:**
+- First retrieval after idle: 15.21s (Neon waking up)
+- Subsequent retrievals: 1.57-7.32s (warm)
+
+**LLM call latency:**
+- classify_incident: 4-9s (Gemini Flash, free tier)
+- investigate_with_context: 7-9s (Gemini Flash with context)
+
+**Total investigation latency: 13-32s**
+Dominated by Neon cold start on first call. Production deployment
+with always-on PostgreSQL would reduce to 8-15s consistently.
+
+---
+
+### Phase 8 Decisions Locked
+- @observe decorator on node functions creates child spans automatically
+- langfuse.update_current_span() updates active span within @observe
+- flush() called after all investigations to ensure data sent
+- Neon cold start is a development environment issue — production
+  PostgreSQL checkpointer resolves this
+
+
 ## Decisions Locked
 
 These decisions were made deliberately and should not be revisited
@@ -1068,49 +1144,146 @@ without a specific measurable reason:
     update_state is correct pattern for LangGraph 1.1.8
 26. **affected_systems empty → substitute unknown** — validation
     allows pipeline to continue, insufficient_context routes to human
+27. **Langfuse v4 API — get_client + @observe + update_current_span**
+    v4 is OTEL-based, v2/v3 APIs removed. Always check live docs.
+28. **Three instrumented nodes** — classify, retrieve, investigate.
+    validate_input and routing nodes not instrumented — no LLM calls,
+    no retrieval, not worth the span overhead.
 
 
-                    ┌─────────────────┐
-                    │   START         │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ validate_input  │ ← InputValidator runs here
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │ insufficient │ valid        │
-              ▼              │              │
-     ┌────────────────┐      │              │
-     │ request_clarif │      │              │
-     │ ication        │      │              │
-     └────────────────┘      │              │
-                    ┌────────▼────────┐
-                    │ classify_       │ ← Pass 1 LLM call
-                    │ incident        │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ retrieve_       │ ← Hybrid retrieval
-                    │ context         │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ investigate_    │ ← Pass 2 LLM call
-                    │ with_context    │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │ complex/     │ simple/      │
-              │ low conf     │ high conf    │
-              ▼              ▼              │
-     ┌──────────────┐ ┌──────────────┐     │
-     │ human_review │ │ auto_resolve │     │
-     │ (interrupt)  │ │              │     │
-     └──────────────┘ └──────────────┘     │
-              │              │
-              └──────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │    END          │
-                    └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    INCIDENT TRIAGE AGENT                        │
+│                                                                 │
+│  Natural Language Incident                                      │
+│           │                                                     │
+│           ▼                                                     │
+│  ┌─────────────────┐                                            │
+│  │ validate_input  │ ← InputValidator (security layer)          │
+│  └────────┬────────┘                                            │
+│           │ valid / invalid                                     │
+│    ┌──────┴──────┐                                              │
+│    │             │                                              │
+│    ▼             ▼                                              │
+│  request_    classify_incident  ← Pass 1 LLM (Gemini Flash)     │
+│  clarification  │               ← @observe span                 │
+│    │            │ affected_systems                              │
+│    │            ▼                                               │
+│    │    retrieve_context       ← Hybrid Search                  │
+│    │         │                 ← pgvector + BM25                │
+│    │         │                 ← @observe span                  │
+│    │         │ runbooks + incidents                             │
+│    │         ▼                                                  │
+│    │  investigate_with_context ← Pass 2 LLM (Gemini Flash)      │
+│    │         │                 ← @observe span                  │
+│    │         │ final_report + confidence_delta                  │
+│    │    ┌────┴────┐                                             │
+│    │    │  route  │ ← multi-signal routing                      │
+│    │    └────┬────┘                                             │
+│    │    escalate?  confidence<0.4?  consistency_flags?          │
+│    │    contradiction?  complexity=complex?                     │
+│    │         │                                                  │
+│    │   ┌─────┴──────┐                                           │
+│    │   │            │                                           │
+│    ▼   ▼            ▼                                           │
+│  END  human_review  auto_resolve                                │
+│       (interrupt)   (low sev +                                  │
+│       state update  high conf)                                  │
+│       resume                                                    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    RETRIEVAL LAYER                              │
+│                                                                 │
+│  Query (incident_description + affected_systems)                │
+│           │                                                     │
+│    ┌──────┴──────┐                                              │
+│    │             │                                              │
+│    ▼             ▼                                              │
+│  Vector Search  Keyword Search (BM25)                           │
+│  all-MiniLM     PostgreSQL FTS                                  │
+│  384 dims       OR logic                                        │
+│  pgvector       technical terms only                            │
+│    │             │                                              │
+│    └──────┬──────┘                                              │
+│           │                                                     │
+│    Reciprocal Rank Fusion                                       │
+│    vector 0.7 + keyword 0.3                                     │
+│           │                                                     │
+│    Deduplicate by doc_id                                        │
+│           │                                                     │
+│    Top 3 runbooks + Top 3 incidents                             │
+│           │                                                     │
+│    format_context() → context string → Pass 2                   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    CORPUS                                       │
+│                                                                 │
+│  data/runbooks/                                                 │
+│    platform/    6 runbooks  (ETL, sync, warehouse, schema)      │
+│    commodity/   4 runbooks  (price feed, supplier, futures)     │
+│    demand/      5 runbooks  (forecast, promo, retrain)          │
+│                                                                 │
+│  data/incidents/                                                │
+│    platform/    6 incidents                                     │
+│    commodity/   5 incidents                                     │
+│    demand/      4 incidents                                     │
+│                                                                 │
+│  30 documents → 259 chunks → 384-dim embeddings → pgvector      │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    OBSERVABILITY (Langfuse v4)                  │
+│                                                                 │
+│  incident_investigation  [root trace @observe]                  │
+│    ├── classify_incident    [span @observe]                     │
+│    │     input: incident text                                   │
+│    │     output: severity, affected_systems, confidence         │
+│    ├── retrieve_context     [span @observe]                     │
+│    │     input: affected_systems                                │
+│    │     output: runbooks_retrieved, incidents_retrieved        │
+│    └── investigate_with_context [span @observe]                 │
+│          input: context_length, runbooks_used, incidents_used   │
+│          output: severity, confidence, confidence_delta,        │
+│                  escalate, consistency_flags                    │
+│                                                                 │
+│  Key metric: confidence_delta (Pass1 → Pass2)                   │
+│    +0.50 = relevant context found, grounded report              │
+│    -0.25 = irrelevant context, model correctly uncertain        │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    SECURITY LAYERS                              │
+│                                                                 │
+│  Layer 1: InputValidator     — before any LLM call              │
+│  Layer 2: RetrievalSanitizer — before context passed to LLM     │
+│  Layer 3: Pydantic schema    — enforces output structure        │
+│  Layer 4: ActionGuard        — tool risk classification (W14)   │
+│  Layer 5: AuditLogger        — immutable audit trail            │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    TWO-PASS PIPELINE                            │
+│                                                                 │
+│  Pass 1: classify_incident                                      │
+│    No context → LLM → IncidentReport                            │
+│    confidence: 0.35-0.50 (expected low)                         │
+│    affected_systems → used as retrieval query                   │
+│                                                                 │
+│  Retrieval: retrieve_for_incident                               │
+│    affected_systems → infer_metadata_filters                    │
+│    → hybrid_search (vector + BM25) → top 3 per corpus type      │
+│    → format_context (800 char truncation per chunk)             │
+│                                                                 │
+│  Consistency check: check_report_consistency                    │
+│    severity_escalated_with_context                              │
+│    affected_systems_significantly_changed                       │
+│    confidence_dropped_with_context                              │
+│    escalation_flipped                                           │
+│                                                                 │
+│  Pass 2: investigate_with_context                               │
+│    Context → LLM → IncidentReport (grounded)                    │
+│    confidence: 0.70-0.95 (relevant) or 0.10 (irrelevant)        │
+│                                                                 │
+│  Confidence delta = primary quality signal                      │
+└─────────────────────────────────────────────────────────────────┘
