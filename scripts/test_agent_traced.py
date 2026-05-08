@@ -16,7 +16,8 @@ langfuse = get_client()
 
 @observe(name="incident_investigation")
 def run_investigation(incident: str, thread_id: str) -> dict:
-    langfuse.update_current_observation(
+    # Update the current span created by @observe
+    langfuse.update_current_span(
         input={"incident": incident},
         metadata={"source": "test_script"},
     )
@@ -26,7 +27,7 @@ def run_investigation(incident: str, thread_id: str) -> dict:
     result = graph.invoke(initial_state, config=config)
 
     if result.get("final_report"):
-        langfuse.update_current_observation(
+        langfuse.update_current_span(
             output={
                 "severity": result["final_report"].severity.value,
                 "auto_resolved": result.get("auto_resolved", False),
