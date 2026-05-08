@@ -110,7 +110,7 @@ def retrieve_context(state: AgentState) -> dict:
             ],
         }
 
-    update_current_span(
+    langfuse.update_current_observation(
         input={
             "affected_systems": state.initial_report.affected_systems,
             "incident": state.incident_description[:200],
@@ -134,11 +134,13 @@ def retrieve_context(state: AgentState) -> dict:
         incidents = results.get("past_incidents", [])
         context = format_context(results)
 
-        update_current_span(
+        langfuse.update_current_observation(
             output={
                 "runbooks_retrieved": [r["doc_id"] for r in runbooks],
                 "incidents_retrieved": [i["doc_id"] for i in incidents],
-                "top_runbook_score": runbooks[0].get("rrf_score", runbooks[0].get("similarity", 0)) if runbooks else 0,
+                "top_score": runbooks[0].get(
+                    "rrf_score", runbooks[0].get("similarity", 0)
+                ) if runbooks else 0,
             }
         )
 
@@ -154,7 +156,7 @@ def retrieve_context(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        update_current_span(
+        langfuse.update_current_observation(
             output={"error": str(e)},
             level="ERROR",
         )
