@@ -60,7 +60,7 @@ def request_clarification(state: AgentState) -> dict:
 @observe(name="classify_incident")
 def classify_incident(state: AgentState) -> dict:
     """Node 3 — Pass 1 LLM call."""
-    langfuse.update_current_observation(
+    langfuse.update_current_span(
         input={"incident": state.incident_description[:200]},
     )
 
@@ -69,7 +69,7 @@ def classify_incident(state: AgentState) -> dict:
             state.incident_description
         )
 
-        langfuse.update_current_observation(
+        langfuse.update_current_span(
             output={
                 "severity": initial_report.severity.value,
                 "affected_systems": initial_report.affected_systems,
@@ -86,7 +86,7 @@ def classify_incident(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        langfuse.update_current_observation(
+        langfuse.update_current_span(
             output={"error": str(e)},
             level="ERROR",
         )
@@ -110,7 +110,7 @@ def retrieve_context(state: AgentState) -> dict:
             ],
         }
 
-    langfuse.update_current_observation(
+    langfuse.update_current_span(
         input={
             "affected_systems": state.initial_report.affected_systems,
             "incident": state.incident_description[:200],
@@ -134,7 +134,7 @@ def retrieve_context(state: AgentState) -> dict:
         incidents = results.get("past_incidents", [])
         context = format_context(results)
 
-        langfuse.update_current_observation(
+        langfuse.update_current_span(
             output={
                 "runbooks_retrieved": [r["doc_id"] for r in runbooks],
                 "incidents_retrieved": [i["doc_id"] for i in incidents],
@@ -156,7 +156,7 @@ def retrieve_context(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        langfuse.update_current_observation(
+        langfuse.update_current_span(
             output={"error": str(e)},
             level="ERROR",
         )
@@ -181,7 +181,7 @@ def investigate_with_context(state: AgentState) -> dict:
             ],
         }
 
-    langfuse.update_current_observation(
+    langfuse.update_current_span(
         input={
             "incident": state.incident_description[:200],
             "context_length": len(state.context_formatted),
@@ -208,7 +208,7 @@ def investigate_with_context(state: AgentState) -> dict:
             - state.initial_report.system_specific_confidence
         )
 
-        langfuse.update_current_observation(
+        langfuse.update_current_span(
             output={
                 "severity": final_report.severity.value,
                 "confidence": final_report.system_specific_confidence,
