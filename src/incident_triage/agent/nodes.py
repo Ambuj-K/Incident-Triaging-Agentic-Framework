@@ -3,7 +3,9 @@ from incident_triage.clients.llm_client import LLMClient
 from incident_triage.retrieval.retriever import retrieve_for_incident
 from incident_triage.pipeline.triage_pipeline import format_context, check_report_consistency
 from incident_triage.config.llm_config import DEFAULT_CONFIG
-from incident_triage.observability.tracer import get_langfuse
+from langfuse import get_client, observe
+
+langfuse = get_client()
 
 
 llm_client = LLMClient(config=DEFAULT_CONFIG)
@@ -55,13 +57,11 @@ def request_clarification(state: AgentState) -> dict:
     }
 
 
+@observe(name="classify_incident")
 def classify_incident(state: AgentState) -> dict:
     """Node 3 — Pass 1 LLM call."""
-    lf = get_langfuse()
-
-    span = lf.span(
-        name="classify_incident",
-        input={"incident": state.incident_description},
+    update_current_observation(
+        input={"incident": state.incident_description[:200]},
     )
 
     try:
@@ -69,11 +69,13 @@ def classify_incident(state: AgentState) -> dict:
             state.incident_description
         )
 
-        span.end(output={
-            "severity": initial_report.severity.value,
-            "affected_systems": initial_report.affected_systems,
-            "confidence": initial_report.system_specific_confidence,
-        })
+        propagate_attributes(
+            output={
+                "severity": initial_report.severity.value,
+                "affected_systems": initial_report.affected_systems,
+                "confidence": initial_report.system_specific_confidence,
+            }
+        )
 
         return {
             "initial_report": initial_report,
@@ -84,7 +86,10 @@ def classify_incident(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        span.end(output={"error": str(e)}, level="ERROR")
+        update_current_span(
+            output={"error": str(e)},
+            level="ERROR",
+        )
         return {
             "error_occurred": True,
             "error_message": f"Classification failed: {str(e)}",
@@ -94,16 +99,23 @@ def classify_incident(state: AgentState) -> dict:
         }
 
 
+@observe(name="retrieve_context")
 def retrieve_context(state: AgentState) -> dict:
-    """
-    Node 4 — Retrieve relevant runbooks and past incidents.
-    Uses affected_systems from initial_report to guide retrieval.
-    """
+    """Node 4 — Retrieve relevant runbooks and past incidents."""
     if state.error_occurred or state.initial_report is None:
         return {
             "retrieval_attempted": False,
-            "steps_taken": state.steps_taken + ["retrieve_context: skipped - no initial report"],
+            "steps_taken": state.steps_taken + [
+                "retrieve_context: skipped - no initial report"
+            ],
         }
+
+    update_current_span(
+        input={
+            "affected_systems": state.initial_report.affected_systems,
+            "incident": state.incident_description[:200],
+        }
+    )
 
     try:
         affected_systems = [
@@ -122,6 +134,14 @@ def retrieve_context(state: AgentState) -> dict:
         incidents = results.get("past_incidents", [])
         context = format_context(results)
 
+        update_current_span(
+            output={
+                "runbooks_retrieved": [r["doc_id"] for r in runbooks],
+                "incidents_retrieved": [i["doc_id"] for i in incidents],
+                "top_runbook_score": runbooks[0].get("rrf_score", runbooks[0].get("similarity", 0)) if runbooks else 0,
+            }
+        )
+
         return {
             "retrieved_runbooks": runbooks,
             "retrieved_incidents": incidents,
@@ -134,15 +154,22 @@ def retrieve_context(state: AgentState) -> dict:
         }
 
     except Exception as e:
+        update_current_span(
+            output={"error": str(e)},
+            level="ERROR",
+        )
         return {
             "retrieval_attempted": True,
             "context_formatted": "Retrieval failed — proceeding without context.",
             "error_occurred": True,
             "error_message": f"Retrieval failed: {str(e)}",
-            "steps_taken": state.steps_taken + [f"retrieve_context: error - {str(e)}"],
+            "steps_taken": state.steps_taken + [
+                f"retrieve_context: error - {str(e)}"
+            ],
         }
 
 
+@observe(name="investigate_with_context")
 def investigate_with_context(state: AgentState) -> dict:
     """Node 5 — Pass 2 LLM call."""
     if state.error_occurred and state.initial_report is None:
@@ -152,15 +179,13 @@ def investigate_with_context(state: AgentState) -> dict:
             ],
         }
 
-    lf = get_langfuse()
-    span = lf.span(
-        name="investigate_with_context",
+    langfuse.update_current_observation(
         input={
             "incident": state.incident_description[:200],
             "context_length": len(state.context_formatted),
             "runbooks_used": [r["doc_id"] for r in state.retrieved_runbooks],
             "incidents_used": [i["doc_id"] for i in state.retrieved_incidents],
-        },
+        }
     )
 
     try:
@@ -181,13 +206,15 @@ def investigate_with_context(state: AgentState) -> dict:
             - state.initial_report.system_specific_confidence
         )
 
-        span.end(output={
-            "severity": final_report.severity.value,
-            "confidence": final_report.system_specific_confidence,
-            "confidence_delta": confidence_delta,
-            "escalate": final_report.escalate,
-            "consistency_flags": consistency["consistency_flags"],
-        })
+        langfuse.update_current_observation(
+            output={
+                "severity": final_report.severity.value,
+                "confidence": final_report.system_specific_confidence,
+                "confidence_delta": round(confidence_delta, 3),
+                "escalate": final_report.escalate,
+                "consistency_flags": consistency["consistency_flags"],
+            }
+        )
 
         review_reason = ""
         if consistency["requires_review"]:
@@ -233,7 +260,6 @@ def investigate_with_context(state: AgentState) -> dict:
                 f"investigate_with_context: error - {str(e)}"
             ],
         }
-
 
 def human_review(state: AgentState) -> dict:
     """
