@@ -60,7 +60,7 @@ def request_clarification(state: AgentState) -> dict:
 @observe(name="classify_incident")
 def classify_incident(state: AgentState) -> dict:
     """Node 3 — Pass 1 LLM call."""
-    update_current_observation(
+    langfuse.update_current_observation(
         input={"incident": state.incident_description[:200]},
     )
 
@@ -69,7 +69,7 @@ def classify_incident(state: AgentState) -> dict:
             state.incident_description
         )
 
-        propagate_attributes(
+        langfuse.update_current_observation(
             output={
                 "severity": initial_report.severity.value,
                 "affected_systems": initial_report.affected_systems,
@@ -86,7 +86,7 @@ def classify_incident(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        update_current_span(
+        langfuse.update_current_observation(
             output={"error": str(e)},
             level="ERROR",
         )
