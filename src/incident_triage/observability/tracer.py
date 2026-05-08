@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def get_langfuse():
     """Get global Langfuse client configured from environment variables."""
     return get_client()
