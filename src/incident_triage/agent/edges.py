@@ -51,7 +51,16 @@ def route_after_investigation(state: AgentState) -> str:
         return "human_review"
 
     if state.consistency_flags:
-        return "human_review"
+        if report.severity == Severity.LOW:
+            non_confidence_flags = [
+                f for f in state.consistency_flags
+                if "confidence_dropped" not in f
+            ]
+            if non_confidence_flags:
+                return "human_review"
+            # confidence drop only on low severity — fall through to auto_resolve check
+        else:
+            return "human_review"
 
     if report.escalate:
         return "human_review"
