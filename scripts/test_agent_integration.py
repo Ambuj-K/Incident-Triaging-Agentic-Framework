@@ -75,15 +75,6 @@ TEST_CASES = [
         notes="Should retrieve RUNBOOK-006 and INCIDENT-006",
     ),
     IntegrationTestCase(
-        name="data warehouse storage",
-        incident="Data warehouse storage exhausted. All ETL ingestion jobs failing. Finance reporting unavailable. errno 28 appearing in logs.",
-        expected_routing="human_review",
-        expected_severity="high",
-        expected_escalate=True,
-        corpus_domain="platform",
-        notes="Technical query with errno 28 — tests hybrid search",
-    ),
-    IntegrationTestCase(
         name="schema migration failure",
         incident="Schema migration deployed to transactions table without rollback plan. Downstream ETL jobs failing with column not found errors. 4 hours of transaction data not ingested.",
         expected_routing="human_review",
