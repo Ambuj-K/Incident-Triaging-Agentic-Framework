@@ -1,2 +1,21 @@
 .env
 */__pycache__
+
+# Environment
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Test outputs
+integration_test_results.json
+
+# Database
+*.db
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
