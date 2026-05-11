@@ -224,6 +224,15 @@ TEST_CASES = [
         corpus_domain="demand",
         notes="Potential impact rule — severity must not exceed high",
     ),
+    IntegrationTestCase(
+        name="data warehouse storage",
+        incident="Data warehouse storage exhausted. All ETL ingestion jobs failing. Finance reporting unavailable. errno 28 appearing in logs.",
+        expected_routing="human_review",
+        expected_severity="critical",  # model is correct — active outage
+        expected_escalate=True,
+        corpus_domain="platform",
+        notes="Technical query with errno 28 — tests hybrid search. Active outage justifies critical.",
+    ),
 ]
 
 
