@@ -310,8 +310,6 @@ def run_integration_tests():
             print(f"  Routing: {actual_routing} (expected: {case.expected_routing})")
             if actual_severity:
                 print(f"  Severity: {actual_severity} (expected: {case.expected_severity})")
-            if result.get("consistency_flags"):
-                print(f"  Consistency flags: {result['consistency_flags']}")
 
         except Exception as e:
             results["errors"] += 1
