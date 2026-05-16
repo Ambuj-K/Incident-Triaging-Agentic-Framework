@@ -10,6 +10,7 @@ __pycache__/
 # Test outputs
 integration_test_results.json
 agent_eval_results.json
+agent_eval_baseline.json
 
 # Database
 *.db
