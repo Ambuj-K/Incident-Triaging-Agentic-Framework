@@ -8,6 +8,8 @@ def format_context(retrieval_results: dict) -> str:
     """
     Format retrieved runbooks and past incidents into
     a structured context string for the LLM prompt.
+    Historical notes sections get higher truncation limit
+    as they contain root cause and operational detail.
     """
     context_parts = []
 
@@ -15,22 +17,25 @@ def format_context(retrieval_results: dict) -> str:
     if runbooks:
         context_parts.append("## RELEVANT RUNBOOKS")
         for i, doc in enumerate(runbooks[:3], 1):
+            # Historical notes contain root cause detail — allow more chars
+            limit = 1200 if doc.get("section") == "historical notes" else 800
             context_parts.append(
                 f"\n### Runbook {i}: {doc['doc_id']} "
                 f"(Team: {doc['team']}, "
                 f"Section: {doc['section']})\n"
-                f"{doc['content'][:800]}"
+                f"{doc['content'][:limit]}"
             )
 
     past_incidents = retrieval_results.get("past_incidents", [])
     if past_incidents:
         context_parts.append("\n## RELEVANT PAST INCIDENTS")
         for i, doc in enumerate(past_incidents[:3], 1):
+            limit = 1200 if doc.get("section") == "historical notes" else 800
             context_parts.append(
                 f"\n### Past Incident {i}: {doc['doc_id']} "
                 f"(Team: {doc['team']}, "
                 f"Section: {doc['section']})\n"
-                f"{doc['content'][:800]}"
+                f"{doc['content'][:limit]}"
             )
 
     if not context_parts:
