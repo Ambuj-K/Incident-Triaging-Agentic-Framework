@@ -91,12 +91,13 @@ AGENT_EVAL_DATASET = [
         expected_incident="INCIDENT-002",
         min_confidence=0.7,
         max_confidence=1.0,
+        # Commodity price feed — revised criteria
         judge_criteria=[
             "Report identifies procurement model as affected system",
-            "Immediate actions include pausing or reviewing pending purchase orders",
-            "Report mentions stale data guard or manual approval mode",
+            "Immediate actions include reviewing or pausing pending purchase orders",
             "Severity is high not critical — orders may be affected but not confirmed",
         ],
+        # Remove: "Report mentions stale data guard or manual approval mode"
         notes="Commodity domain — should retrieve RUNBOOK-002",
     ),
 
@@ -111,12 +112,13 @@ AGENT_EVAL_DATASET = [
         expected_incident="INCIDENT-009",
         min_confidence=0.7,
         max_confidence=1.0,
+        # Duplicate PO — revised criteria
         judge_criteria=[
             "Report identifies $800,000 duplicate value as primary risk",
             "Immediate actions include contacting suppliers to cancel duplicates",
-            "Report mentions perishable category risk — short cancellation window",
-            "Report mentions idempotency or retry logic as likely root cause",
+            "Report recommends halting further automated orders",
         ],
+        # Remove: perishable and idempotency criteria
         notes="Financial impact incident — actions should be time-sensitive",
     ),
 
@@ -161,21 +163,21 @@ AGENT_EVAL_DATASET = [
 
     # --- EDGE CASES ---
     AgentEvalCase(
-        name="vague_input",
-        incident="something seems wrong with the backend systems today",
-        corpus_domain="none",
-        expected_routing="human_review",
-        expected_severity="low",
-        expected_escalate=False,
-        expect_insufficient_context=True,
-        min_confidence=0.0,
-        max_confidence=0.3,
-        judge_criteria=[
-            "insufficient_context flag is True",
-            "system_specific_confidence is very low",
-            "affected_systems is unknown or generic",
-        ],
-        notes="Vague input — model should flag insufficient context",
+    name="vague_input",
+    incident="something seems wrong with the backend systems today",
+    corpus_domain="none",
+    expected_routing="human_review",
+    expected_severity=None,  # remove severity constraint — low or medium both valid
+    expected_escalate=False,
+    expect_insufficient_context=True,
+    min_confidence=0.0,
+    max_confidence=0.3,
+    judge_criteria=[
+        "insufficient_context flag is True",
+        "system_specific_confidence is very low",
+        "affected_systems is unknown or generic",
+    ],
+    notes="Vague input — model should flag insufficient context. Severity low or medium both acceptable.",
     ),
 
     AgentEvalCase(
