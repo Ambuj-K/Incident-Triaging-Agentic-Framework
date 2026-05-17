@@ -4,6 +4,7 @@ from incident_triage.models.incident_report import IncidentReport
 from incident_triage.config.llm_config import LLMConfig, DEFAULT_CONFIG
 import os
 
+
 class LLMClient:
 
     SYSTEM_PROMPT = """You are an incident triage assistant for a large retail company.
@@ -68,11 +69,24 @@ class LLMClient:
 
     def __init__(self, config: LLMConfig = DEFAULT_CONFIG):
         self.config = config
-        raw_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        self.raw_client = genai.Client(
+            api_key=os.environ["GOOGLE_API_KEY"]
+        )
         self.client = instructor.from_genai(
-            client=raw_client,
+            client=self.raw_client,
             mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
         )
+        # Token tracking
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_calls = 0
+
+    def _estimate_tokens(self, text: str) -> int:
+        """
+        Rough token estimate when API does not return usage.
+        1 token ≈ 4 chars for English text.
+        """
+        return len(text) // 4
 
     def triage_incident(self, incident_description: str) -> IncidentReport:
         """
@@ -80,7 +94,7 @@ class LLMClient:
         Returns initial IncidentReport with affected_systems
         that can be used for retrieval.
         """
-        return self.client.chat.completions.create(
+        report = self.client.chat.completions.create(
             model=self.config.model,
             response_model=IncidentReport,
             messages=[
@@ -96,6 +110,15 @@ class LLMClient:
             max_retries=self.config.max_retries,
         )
 
+        # Estimate tokens from prompt content
+        input_text = self.SYSTEM_PROMPT + incident_description
+        output_text = report.model_dump_json()
+        self.total_input_tokens += self._estimate_tokens(input_text)
+        self.total_output_tokens += self._estimate_tokens(output_text)
+        self.total_calls += 1
+
+        return report
+
     def triage_with_context(
         self,
         incident_description: str,
@@ -109,7 +132,7 @@ class LLMClient:
             context=context
         )
 
-        return self.client.chat.completions.create(
+        report = self.client.chat.completions.create(
             model=self.config.model,
             response_model=IncidentReport,
             messages=[
@@ -124,3 +147,35 @@ class LLMClient:
             ],
             max_retries=self.config.max_retries,
         )
+
+        input_text = system_prompt + incident_description
+        output_text = report.model_dump_json()
+        self.total_input_tokens += self._estimate_tokens(input_text)
+        self.total_output_tokens += self._estimate_tokens(output_text)
+        self.total_calls += 1
+
+        return report
+
+    def get_usage_stats(self) -> dict:
+        """Return token usage and estimated cost."""
+        from incident_triage.observability.tracer import estimate_cost
+        cost = estimate_cost(
+            self.total_input_tokens,
+            self.total_output_tokens,
+            self.config.model,
+        )
+        return {
+            "total_calls": self.total_calls,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_tokens": (
+                self.total_input_tokens + self.total_output_tokens
+            ),
+            "estimated_cost_usd": round(cost, 6),
+        }
+
+    def reset_usage(self):
+        """Reset token counters."""
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_calls = 0
