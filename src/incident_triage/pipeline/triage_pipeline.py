@@ -94,6 +94,27 @@ def check_report_consistency(
         "requires_review": len(flags) > 0,
     }
 
+def should_skip_retrieval(initial_report) -> bool:
+    """
+    Determine whether to skip retrieval and Pass 2 entirely.
+    Safe for low severity, simple, confident, unflagged incidents.
+    Halves cost for incidents that do not need retrieval grounding.
+    """
+    from incident_triage.models.incident_report import Severity, Complexity
+
+    if initial_report.severity != Severity.LOW:
+        return False
+    if initial_report.general_diagnosis_confidence < 0.5:
+        return False
+    if initial_report.contradiction_detected:
+        return False
+    if initial_report.insufficient_context:
+        return False
+    if initial_report.complexity != Complexity.SIMPLE:
+        return False
+
+    return True
+
 
 class TriagePipeline:
     """
