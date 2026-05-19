@@ -91,3 +91,21 @@ def route_after_investigation(state: AgentState) -> str:
             return "auto_resolve"
 
     return "human_review"
+
+
+def route_after_classification(state: AgentState) -> str:
+    """
+    After Pass 1 classification:
+    - Error occurred → human review
+    - No initial report → human review
+    - Simple, low severity, confident, no flags → auto resolve (fast path)
+    - Otherwise → retrieve context
+    """
+    if state.error_occurred or state.initial_report is None:
+        return "human_review"
+
+    from incident_triage.pipeline.triage_pipeline import should_skip_retrieval
+    if should_skip_retrieval(state.initial_report):
+        return "auto_resolve"
+
+    return "retrieve_context"
