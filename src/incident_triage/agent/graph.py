@@ -56,6 +56,7 @@ def build_graph(interrupt_on_human_review: bool = True):
         {
             "human_review": "human_review",
             "retrieve_context": "retrieve_context",
+            "auto_resolve": "auto_resolve",
         }
     )
 
