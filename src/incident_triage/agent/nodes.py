@@ -4,6 +4,10 @@ from incident_triage.retrieval.retriever import retrieve_for_incident
 from incident_triage.pipeline.triage_pipeline import format_context, check_report_consistency
 from incident_triage.config.llm_config import DEFAULT_CONFIG
 from langfuse import get_client, observe
+from incident_triage.agent.tools import (
+    check_system_status,
+    get_escalation_contacts,
+)
 
 langfuse = get_client()
 
@@ -262,6 +266,124 @@ def investigate_with_context(state: AgentState) -> dict:
                 f"investigate_with_context: error - {str(e)}"
             ],
         }
+
+
+@observe(name="investigate_with_context")
+def investigate_with_context(state: AgentState) -> dict:
+    """Node 5 — Pass 2 LLM call with tool enrichment."""
+    if state.error_occurred and state.initial_report is None:
+        return {
+            "steps_taken": state.steps_taken + [
+                "investigate_with_context: skipped - error state"
+            ],
+        }
+
+    langfuse.update_current_span(
+        input={
+            "incident": state.incident_description[:200],
+            "context_length": len(state.context_formatted),
+            "runbooks_used": [r["doc_id"] for r in state.retrieved_runbooks],
+            "incidents_used": [i["doc_id"] for i in state.retrieved_incidents],
+        }
+    )
+
+    try:
+        context = state.context_formatted or "No relevant context found."
+
+        final_report = llm_client.triage_with_context(
+            incident_description=state.incident_description,
+            context=context,
+        )
+
+        consistency = check_report_consistency(
+            state.initial_report,
+            final_report,
+        )
+
+        confidence_delta = (
+            final_report.system_specific_confidence
+            - state.initial_report.system_specific_confidence
+        )
+
+        # Tool calls — enrich report with live system status
+        tool_results = {}
+
+        # Check status of each affected system
+        system_statuses = []
+        for system in final_report.affected_systems[:3]:
+            status = check_system_status(system)
+            system_statuses.append(status)
+
+        tool_results["system_statuses"] = system_statuses
+
+        # Get escalation contacts if escalation needed
+        escalation_contacts = None
+        if final_report.escalate and state.retrieved_runbooks:
+            # Infer team from top retrieved runbook
+            top_runbook = state.retrieved_runbooks[0]
+            team = top_runbook.get("team", "platform_engineering")
+            escalation_contacts = get_escalation_contacts(team)
+            tool_results["escalation_contacts"] = escalation_contacts
+
+        langfuse.update_current_span(
+            output={
+                "severity": final_report.severity.value,
+                "confidence": final_report.system_specific_confidence,
+                "confidence_delta": round(confidence_delta, 3),
+                "escalate": final_report.escalate,
+                "consistency_flags": consistency["consistency_flags"],
+                "systems_checked": len(system_statuses),
+                "escalation_contacts_retrieved": escalation_contacts is not None,
+            }
+        )
+
+        review_reason = ""
+        if consistency["requires_review"]:
+            review_reason = (
+                f"Consistency flags: "
+                f"{', '.join(consistency['consistency_flags'])}"
+            )
+        elif final_report.escalate:
+            review_reason = (
+                f"Severity {final_report.severity.value} requires escalation"
+            )
+        elif final_report.system_specific_confidence < 0.4:
+            review_reason = (
+                f"Low confidence ({final_report.system_specific_confidence})"
+                f" — insufficient context"
+            )
+        elif final_report.contradiction_detected:
+            review_reason = "Contradictory information in incident description"
+        elif final_report.insufficient_context:
+            review_reason = "Insufficient context for reliable triage"
+
+        return {
+            "final_report": final_report,
+            "consistency_flags": consistency["consistency_flags"],
+            "human_review_reason": review_reason,
+            "tool_results": tool_results,
+            "steps_taken": state.steps_taken + [
+                f"investigate_with_context: "
+                f"severity={final_report.severity.value}, "
+                f"confidence={final_report.system_specific_confidence}, "
+                f"escalate={final_report.escalate}, "
+                f"consistency_flags={len(consistency['consistency_flags'])}, "
+                f"tools_called={len(tool_results)}"
+            ],
+        }
+
+    except Exception as e:
+        return {
+            "final_report": state.initial_report,
+            "error_occurred": True,
+            "error_message": (
+                f"Investigation failed: {str(e)}, using initial report"
+            ),
+            "steps_taken": state.steps_taken + [
+                f"investigate_with_context: error - {str(e)}"
+            ],
+        }
+
 
 def human_review(state: AgentState) -> dict:
     """
