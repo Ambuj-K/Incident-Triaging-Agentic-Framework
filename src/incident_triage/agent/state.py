@@ -28,6 +28,7 @@ class AgentState(BaseModel):
     # Pass 2 output
     consistency_flags: list[str] = []
     final_report: Optional[IncidentReport] = None
+    tool_results: dict = {}
 
     # Routing signals
     requires_human_review: bool = False
