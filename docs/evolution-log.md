@@ -1425,6 +1425,109 @@ Deferred pending decision on corpus growth strategy.
 
 ---
 
+## Phase 11 — Cost Optimization and Tool Use (Week 11)
+
+### Overview
+Added single-pass fast path for low severity incidents halving cost
+for simple cases, token tracking for cost measurement, and two agent
+tools that enrich investigation reports with live system data.
+
+---
+
+### Iteration 11.1 — Cost Measurement
+Added token tracking to LLMClient using character-based estimation
+(1 token ≈ 4 chars). Measured actual cost per investigation:
+Inventory sync:  2 calls, ~2042 tokens, $0.000293
+ML forecast:     2 calls, ~2212 tokens, $0.000306
+Dashboard:       2 calls, ~1764 tokens, $0.000251
+At scale:
+1,000 investigations/day:  $0.30/day
+10,000 investigations/day: $3.00/day
+
+Note: Character-based estimates are 20-30% lower than actual
+Gemini tokenizer counts. Multiply by 1.25 for realistic projection.
+At 10,000/day realistic cost is ~$3.75/day → $112/month.
+
+---
+
+### Iteration 11.2 — Single-Pass Fast Path
+**Problem:** Every incident regardless of complexity runs two LLM
+calls. Low severity, simple incidents with high Pass 1 confidence
+do not need retrieval grounding.
+
+**Fix:** Added should_skip_retrieval() to triage_pipeline.py.
+Updated route_after_classification in edges.py to route directly
+to auto_resolve when all conditions met:
+- severity == LOW
+- general_diagnosis_confidence >= 0.5
+- complexity == SIMPLE
+- contradiction_detected == False
+- insufficient_context == False
+
+Also added auto_resolve as valid destination in graph.py
+classify_incident conditional edges.
+
+**Cost impact:**
+- Fast path incidents: 1 LLM call instead of 2 → 50% cost reduction
+- Estimated 20-30% of production incidents qualify
+- Overall workload cost reduction: ~10-15%
+
+**Verified:** Dashboard case steps show classify_incident →
+auto_resolve with no retrieve_context or investigate_with_context.
+
+---
+
+### Iteration 11.3 — Tool Use
+Added two agent tools to src/incident_triage/agent/tools.py:
+
+**Tool 1 — check_system_status(system_name)**
+Queries monitoring registry for current system operational status.
+Returns: status, last_incident, response_time_ms, error_rate_pct,
+on_call contact, associated runbook.
+In production: calls PagerDuty/Datadog API.
+Portfolio: mock registry with realistic retail operations data.
+
+**Tool 2 — get_escalation_contacts(team)**
+Returns on-call contacts and escalation procedure for a team.
+Returns: primary/secondary on-call, slack channel, PagerDuty service,
+response SLA by severity, escalation path steps, war room link.
+In production: queries PagerDuty schedule or internal directory.
+Portfolio: mock registry with three team escalation paths.
+
+**Integration:** Tools called in investigate_with_context node
+after Pass 2 LLM call. System status checked for each affected
+system (up to 3). Escalation contacts retrieved when escalate=True.
+Tool results stored in AgentState.tool_results dict.
+
+**Observed behavior:**
+- inventory sync: tools_called=2 (status + escalation)
+- vague input: tools_called=1 (status only, no escalation)
+- dashboard fast path: tools_called=0 (skipped entirely)
+
+---
+
+### Iteration 11.4 — Integration Test Regression
+21/21 passing after all Week 11 changes. No regressions.
+
+---
+
+### Connection to Project 2
+tools.py pattern directly mirrors trade payables explainability
+project's tools.py (data_retrieval, data_processor, data_visualizer,
+no_tool). Same architecture, different domain. Project 2 extends
+this pattern with backtesting tool, contract lookup tool, and
+multi-persona synthesis node.
+
+---
+
+### Phase 11 Decisions Locked
+- Fast path threshold: severity LOW + confidence >= 0.5 + SIMPLE + no flags
+- Tools called conditionally: status always, escalation only when escalate=True
+- Tool results stored in AgentState for audit trail
+- Mock tools use realistic data — production swap is API endpoint change only
+
+---
+
 ## Decisions Locked
 
 These decisions were made deliberately and should not be revisited
