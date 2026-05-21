@@ -1611,3 +1611,9 @@ without a specific measurable reason:
     vs baseline triggers regression flag and requires investigation
 36. **Context truncation locked at 800 chars** — increasing truncation
     affects retrieval ranking indirectly via content weight changes
+37. **Single-pass fast path** — low severity, simple, confident incidents
+    skip retrieval and Pass 2. 50% cost reduction for ~20-30% of workload.
+38. **Tools called conditionally** — system status on every full pipeline
+    run, escalation contacts only when final_report.escalate is True
+39. **Mock tools designed for production swap** — replace mock registry
+    with API endpoint call, interface unchanged
