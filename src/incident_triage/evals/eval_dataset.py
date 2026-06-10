@@ -193,3 +193,93 @@ AGENT_EVAL_DATASET = [
         notes="Contradictory input — model should detect contradiction",
     ),
 ]
+
+# UAT-derived cases — simulate what real on-call engineers
+# asked as follow-ups to agent responses in testing.
+# Pattern from TP_GenAI multi-agent evals.json UAT golden pattern.
+
+SIMULATED_UAT_CASES = [
+    AgentEvalCase(
+        name="inventory_sync_dc_specificity",
+        incident=(
+            "Inventory sync job failed at 3am. 2400 SKUs showing "
+            "incorrect stock levels across 3 regional DCs. "
+            "Downstream replenishment orders blocked."
+        ),
+        corpus_domain="platform",
+        expected_routing="human_review",
+        expected_severity="high",
+        expected_runbook="RUNBOOK-001",
+        min_confidence=0.7,
+        max_confidence=1.0,
+        judge_criteria=[
+            "Immediate actions reference checking sync job logs "
+            "for database connectivity errors specifically",
+            "Report acknowledges it cannot identify which specific "
+            "DCs are affected without additional diagnostic data",
+            "Report recommends re-triggering sync after mitigation "
+            "not just investigating the failure",
+        ],
+        notes=(
+            "UAT-derived: engineers who received generic advice "
+            "spent 20 mins finding the right DC — specificity matters"
+        ),
+    ),
+
+    AgentEvalCase(
+        name="etl_silent_failure_upstream_diagnosis",
+        incident=(
+            "ETL job ingesting POS transaction data completed with "
+            "exit code 0 but downstream systems reporting stale data. "
+            "No records appear to have been written."
+        ),
+        corpus_domain="platform",
+        expected_routing="human_review",
+        expected_severity="high",
+        expected_runbook="RUNBOOK-006",
+        min_confidence=0.6,
+        max_confidence=1.0,
+        judge_criteria=[
+            "Diagnosis explicitly starts upstream at ETL job "
+            "not downstream at reporting systems",
+            "Report identifies exit code 0 with zero records as "
+            "a silent failure pattern — not a normal completion",
+            "Upstream schema change or data format issue mentioned "
+            "as likely root cause",
+        ],
+        notes=(
+            "UAT-derived: engineers who checked downstream first "
+            "wasted 45 mins — upstream-first is the key lesson"
+        ),
+    ),
+
+    AgentEvalCase(
+        name="commodity_stale_feed_order_containment",
+        incident=(
+            "Wheat commodity price feed not updating since 6am. "
+            "Procurement model making sourcing decisions on stale "
+            "price data. Purchase orders may be based on incorrect prices."
+        ),
+        corpus_domain="commodity",
+        expected_routing="human_review",
+        expected_severity="high",
+        expected_runbook="RUNBOOK-002",
+        min_confidence=0.7,
+        max_confidence=1.0,
+        judge_criteria=[
+            "Immediate actions include pausing or reviewing pending "
+            "purchase orders before fixing the feed",
+            "Report identifies the stale window duration as relevant "
+            "for assessing which orders are affected",
+            "Procurement team notification included as an action "
+            "alongside the technical fix",
+        ],
+        notes=(
+            "UAT-derived: engineers fixed the feed but sent orders "
+            "with stale prices — containment must precede fix"
+        ),
+    ),
+]
+
+# Extend main dataset
+AGENT_EVAL_DATASET = AGENT_EVAL_DATASET + SIMULATED_UAT_CASES
