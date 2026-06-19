@@ -200,14 +200,26 @@ def get_escalation_contacts(team: str) -> dict:
         },
     }
 
-    if team_key in escalation_registry:
-        result = escalation_registry[team_key].copy()
-        result["checked_at"] = datetime.utcnow().isoformat() + "Z"
-        return result
-
-    return {
-        "team": team,
-        "status": "unknown",
-        "message": f"Team '{team}' not found in escalation registry",
-        "checked_at": datetime.utcnow().isoformat() + "Z",
-    }
+    if team_key not in escalation_registry:
+        close_matches = [
+            k for k in escalation_registry.keys()
+            if any(
+                word in k
+                for word in team_key.split("_")
+                if len(word) > 3
+            )
+        ]
+        return {
+            "team": team,
+            "status": "unknown",
+            "message": (
+                f"Team '{team}' not found in escalation registry."
+            ),
+            "possible_matches": close_matches[:3],
+            "action": (
+                "try_possible_match_team_name"
+                if close_matches
+                else "contact_hr_directory_for_on_call"
+            ),
+            "checked_at": datetime.utcnow().isoformat() + "Z",
+        }
