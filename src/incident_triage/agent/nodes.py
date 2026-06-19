@@ -8,6 +8,7 @@ from incident_triage.agent.tools import (
     check_system_status,
     get_escalation_contacts,
 )
+from incident_triage.agent.capability_registry import get_capability_summary
 
 langfuse = get_client()
 
@@ -177,7 +178,26 @@ def retrieve_context(state: AgentState) -> dict:
 
 @observe(name="investigate_with_context")
 def investigate_with_context(state: AgentState) -> dict:
-    """Node 5 — Pass 2 LLM call."""
+    """Node 5 — Pass 2 LLM call with tool enrichment.
+
+    Order of operations:
+      1. Check system status for systems identified in Pass 1
+         (state.initial_report.affected_systems) — this can run
+         before Pass 2 because we already know candidate systems
+         from Pass 1 classification.
+      2. Build capability summary from retrieval + live tool results
+         so Pass 2 reasoning is grounded in what is actually known
+         right now, not just retrieved documents.
+      3. Run Pass 2 LLM call with retrieved context + capability summary.
+      4. Get escalation contacts if the Pass 2 report escalates.
+      5. Return final report + audit trail.
+
+    NOTE: This is the single definition of investigate_with_context.
+    A previous version of this file had two functions with this same
+    name — the second silently overwrote the first, so the capability
+    registry integration was dead code until this merge. Do not
+    re-introduce a duplicate definition.
+    """
     if state.error_occurred and state.initial_report is None:
         return {
             "steps_taken": state.steps_taken + [
@@ -195,131 +215,48 @@ def investigate_with_context(state: AgentState) -> dict:
     )
 
     try:
-        context = state.context_formatted or "No relevant context found."
-
-        final_report = llm_client.triage_with_context(
-            incident_description=state.incident_description,
-            context=context,
-        )
-
-        consistency = check_report_consistency(
-            state.initial_report,
-            final_report,
-        )
-
-        confidence_delta = (
-            final_report.system_specific_confidence
-            - state.initial_report.system_specific_confidence
-        )
-
-        langfuse.update_current_span(
-            output={
-                "severity": final_report.severity.value,
-                "confidence": final_report.system_specific_confidence,
-                "confidence_delta": round(confidence_delta, 3),
-                "escalate": final_report.escalate,
-                "consistency_flags": consistency["consistency_flags"],
-            }
-        )
-
-        review_reason = ""
-        if consistency["requires_review"]:
-            review_reason = (
-                f"Consistency flags: "
-                f"{', '.join(consistency['consistency_flags'])}"
-            )
-        elif final_report.escalate:
-            review_reason = (
-                f"Severity {final_report.severity.value} requires escalation"
-            )
-        elif final_report.system_specific_confidence < 0.4:
-            review_reason = (
-                f"Low confidence ({final_report.system_specific_confidence})"
-                f" — insufficient context"
-            )
-        elif final_report.contradiction_detected:
-            review_reason = "Contradictory information in incident description"
-        elif final_report.insufficient_context:
-            review_reason = "Insufficient context for reliable triage"
-
-        return {
-            "final_report": final_report,
-            "consistency_flags": consistency["consistency_flags"],
-            "human_review_reason": review_reason,
-            "steps_taken": state.steps_taken + [
-                f"investigate_with_context: "
-                f"severity={final_report.severity.value}, "
-                f"confidence={final_report.system_specific_confidence}, "
-                f"escalate={final_report.escalate}, "
-                f"consistency_flags={len(consistency['consistency_flags'])}"
-            ],
-        }
-
-    except Exception as e:
-        return {
-            "final_report": state.initial_report,
-            "error_occurred": True,
-            "error_message": (
-                f"Investigation failed: {str(e)}, using initial report"
-            ),
-            "steps_taken": state.steps_taken + [
-                f"investigate_with_context: error - {str(e)}"
-            ],
-        }
-
-
-@observe(name="investigate_with_context")
-def investigate_with_context(state: AgentState) -> dict:
-    """Node 5 — Pass 2 LLM call with tool enrichment."""
-    if state.error_occurred and state.initial_report is None:
-        return {
-            "steps_taken": state.steps_taken + [
-                "investigate_with_context: skipped - error state"
-            ],
-        }
-
-    langfuse.update_current_span(
-        input={
-            "incident": state.incident_description[:200],
-            "context_length": len(state.context_formatted),
-            "runbooks_used": [r["doc_id"] for r in state.retrieved_runbooks],
-            "incidents_used": [i["doc_id"] for i in state.retrieved_incidents],
-        }
-    )
-
-    try:
-        context = state.context_formatted or "No relevant context found."
-
-        final_report = llm_client.triage_with_context(
-            incident_description=state.incident_description,
-            context=context,
-        )
-
-        consistency = check_report_consistency(
-            state.initial_report,
-            final_report,
-        )
-
-        confidence_delta = (
-            final_report.system_specific_confidence
-            - state.initial_report.system_specific_confidence
-        )
-
-        # Tool calls — enrich report with live system status
         tool_results = {}
 
-        # Check status of each affected system
+        # Step 1 — check status of systems identified in Pass 1.
+        # Pass 1's affected_systems is the best signal available
+        # before Pass 2 has run.
         system_statuses = []
-        for system in final_report.affected_systems[:3]:
+        for system in state.initial_report.affected_systems[:3]:
             status = check_system_status(system)
             system_statuses.append(status)
-
         tool_results["system_statuses"] = system_statuses
 
-        # Get escalation contacts if escalation needed
+        # Step 2 — build capability summary grounding Pass 2 in
+        # both retrieved context and live system state.
+        capability_summary = get_capability_summary(
+            retrieved_runbooks=state.retrieved_runbooks,
+            retrieved_incidents=state.retrieved_incidents,
+            tool_results=tool_results,
+        )
+
+        context = state.context_formatted or "No relevant context found."
+        full_context = capability_summary + "\n\n---\n\n" + context
+
+        # Step 3 — Pass 2 LLM call, grounded in full_context.
+        final_report = llm_client.triage_with_context(
+            incident_description=state.incident_description,
+            context=full_context,
+        )
+
+        consistency = check_report_consistency(
+            state.initial_report,
+            final_report,
+        )
+
+        confidence_delta = (
+            final_report.system_specific_confidence
+            - state.initial_report.system_specific_confidence
+        )
+
+        # Step 4 — escalation contacts, now that we know whether
+        # Pass 2 actually wants to escalate.
         escalation_contacts = None
         if final_report.escalate and state.retrieved_runbooks:
-            # Infer team from top retrieved runbook
             top_runbook = state.retrieved_runbooks[0]
             team = top_runbook.get("team", "platform_engineering")
             escalation_contacts = get_escalation_contacts(team)
