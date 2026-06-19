@@ -1,5 +1,17 @@
 from datetime import datetime
-import random
+
+# PRODUCTION NOTE:
+# These tools provide LIVE OPERATIONAL DATA at investigation time:
+#   check_system_status()      -> Datadog or PagerDuty MCP server
+#   get_escalation_contacts()  -> PagerDuty schedules MCP server
+#
+# This is separate from the retrieval corpus (runbooks, past incidents)
+# which is ingested offline into pgvector and retrieved via hybrid search.
+# The corpus is institutional knowledge. These tools are live system state.
+# MCP (Model Context Protocol) is the production standard for the
+# live tool connection layer as of 2026. The agent logic (nodes.py,
+# graph.py, routing) is unchanged whether these are mock dicts or
+# real MCP server calls -- only this implementation layer is swapped.
 
 
 def check_system_status(system_name: str) -> dict:
@@ -13,11 +25,11 @@ def check_system_status(system_name: str) -> dict:
 
     Returns:
         dict with status, last_incident, response_time_ms, on_call
+        (known system), or dict with status="unknown" and a guided
+        next action (unknown system).
     """
-    # Normalize system name
     system_key = system_name.lower().replace(" ", "_").replace("-", "_")
 
-    # Mock system registry with realistic retail operations data
     system_registry = {
         "inventory_management_system": {
             "status": "degraded",
@@ -85,36 +97,37 @@ def check_system_status(system_name: str) -> dict:
         },
     }
 
+    # Known system -- return full status and stop here.
     if system_key in system_registry:
         result = system_registry[system_key].copy()
         result["system"] = system_name
         result["checked_at"] = datetime.utcnow().isoformat() + "Z"
         return result
 
-    # Unknown system — return unknown status
-    if system_key not in system_registry:
-        close_matches = [
-            k for k in system_registry.keys()
-            if any(
-                word in k
-                for word in system_key.split("_")
-                if len(word) > 3
-            )
-        ]
-        return {
-            "system": system_name,
-            "status": "unknown",
-            "message": (
-                f"System '{system_name}' not found in monitoring registry."
-            ),
-            "possible_matches": close_matches[:3],
-            "action": (
-                "try_possible_match_system_name"
-                if close_matches
-                else "system_not_monitored_escalate_manually"
-            ),
-            "checked_at": datetime.utcnow().isoformat() + "Z",
-        }
+    # Unknown system. Execution only reaches this point when the
+    # lookup above failed, so there is no need to re-check membership.
+    close_matches = [
+        k for k in system_registry.keys()
+        if any(
+            word in k
+            for word in system_key.split("_")
+            if len(word) > 3
+        )
+    ]
+    return {
+        "system": system_name,
+        "status": "unknown",
+        "message": (
+            f"System '{system_name}' not found in monitoring registry."
+        ),
+        "possible_matches": close_matches[:3],
+        "action": (
+            "try_possible_match_system_name"
+            if close_matches
+            else "system_not_monitored_escalate_manually"
+        ),
+        "checked_at": datetime.utcnow().isoformat() + "Z",
+    }
 
 
 def get_escalation_contacts(team: str) -> dict:
@@ -124,10 +137,13 @@ def get_escalation_contacts(team: str) -> dict:
     Mock returns realistic on-call data.
 
     Args:
-        team: Team name (platform_engineering, commodity_team, demand_forecast_team)
+        team: Team name (platform_engineering, commodity_team,
+              demand_forecast_team)
 
     Returns:
         dict with on_call contacts, escalation path, response SLA
+        (known team), or dict with status="unknown" and a guided
+        next action (unknown team).
     """
     team_key = team.lower().replace(" ", "_").replace("-", "_")
 
@@ -200,26 +216,31 @@ def get_escalation_contacts(team: str) -> dict:
         },
     }
 
-    if team_key not in escalation_registry:
-        close_matches = [
-            k for k in escalation_registry.keys()
-            if any(
-                word in k
-                for word in team_key.split("_")
-                if len(word) > 3
-            )
-        ]
-        return {
-            "team": team,
-            "status": "unknown",
-            "message": (
-                f"Team '{team}' not found in escalation registry."
-            ),
-            "possible_matches": close_matches[:3],
-            "action": (
-                "try_possible_match_team_name"
-                if close_matches
-                else "contact_hr_directory_for_on_call"
-            ),
-            "checked_at": datetime.utcnow().isoformat() + "Z",
-        }
+    # Known team -- return full contact details and stop here.
+    # THIS WAS THE MISSING BRANCH IN THE ORIGINAL FILE.
+    if team_key in escalation_registry:
+        result = escalation_registry[team_key].copy()
+        result["checked_at"] = datetime.utcnow().isoformat() + "Z"
+        return result
+
+    # Unknown team.
+    close_matches = [
+        k for k in escalation_registry.keys()
+        if any(
+            word in k
+            for word in team_key.split("_")
+            if len(word) > 3
+        )
+    ]
+    return {
+        "team": team,
+        "status": "unknown",
+        "message": f"Team '{team}' not found in escalation registry.",
+        "possible_matches": close_matches[:3],
+        "action": (
+            "try_possible_match_team_name"
+            if close_matches
+            else "contact_hr_directory_for_on_call"
+        ),
+        "checked_at": datetime.utcnow().isoformat() + "Z",
+    }
