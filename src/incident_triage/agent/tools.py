@@ -92,12 +92,29 @@ def check_system_status(system_name: str) -> dict:
         return result
 
     # Unknown system — return unknown status
-    return {
-        "system": system_name,
-        "status": "unknown",
-        "message": f"System '{system_name}' not found in monitoring registry",
-        "checked_at": datetime.utcnow().isoformat() + "Z",
-    }
+    if system_key not in system_registry:
+        close_matches = [
+            k for k in system_registry.keys()
+            if any(
+                word in k
+                for word in system_key.split("_")
+                if len(word) > 3
+            )
+        ]
+        return {
+            "system": system_name,
+            "status": "unknown",
+            "message": (
+                f"System '{system_name}' not found in monitoring registry."
+            ),
+            "possible_matches": close_matches[:3],
+            "action": (
+                "try_possible_match_system_name"
+                if close_matches
+                else "system_not_monitored_escalate_manually"
+            ),
+            "checked_at": datetime.utcnow().isoformat() + "Z",
+        }
 
 
 def get_escalation_contacts(team: str) -> dict:
