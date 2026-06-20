@@ -76,8 +76,11 @@ if __name__ == "__main__":
             "passed": r.passed,
             "routing_correct": r.routing_correct,
             "severity_correct": r.severity_correct,
+            "escalate_correct": r.escalate_correct,
             "confidence_in_range": r.confidence_in_range,
             "retrieval_correct": r.retrieval_correct,
+            "contradiction_correct": r.contradiction_correct,
+            "insufficient_context_correct": r.insufficient_context_correct,
             "judge_score": r.judge_score,
             "judge_reasoning": r.judge_reasoning,
             "actual_routing": r.actual_routing,
@@ -85,6 +88,8 @@ if __name__ == "__main__":
             "actual_confidence": r.actual_confidence,
             "actual_runbook": r.actual_runbook,
             "consistency_flags": r.consistency_flags,
+            "immediate_actions": r.immediate_actions,
+            "summary": r.summary,
         }
         for r in results
     ]
