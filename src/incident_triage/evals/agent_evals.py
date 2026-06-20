@@ -32,6 +32,8 @@ class EvalResult:
     actual_runbook: Optional[str]
     consistency_flags: list[str]
     notes: str
+    immediate_actions: list[str]
+    summary: str
 
 
 def run_agent(case: AgentEvalCase) -> dict:
@@ -140,6 +142,11 @@ def evaluate_case(case: AgentEvalCase) -> EvalResult:
         final_report.system_specific_confidence if final_report else None
     )
 
+    actual_immediate_actions = (
+        final_report.immediate_actions if final_report else []
+    )
+    actual_summary = final_report.summary if final_report else ""
+
     # Check retrieval
     actual_runbook = None
     runbooks = result.get("retrieved_runbooks", [])
@@ -230,6 +237,8 @@ def evaluate_case(case: AgentEvalCase) -> EvalResult:
         actual_runbook=actual_runbook,
         consistency_flags=result.get("consistency_flags", []),
         notes=case.notes,
+        immediate_actions=actual_immediate_actions,
+        summary=actual_summary,
     )
 
 
@@ -287,6 +296,8 @@ def run_evals(
                 actual_runbook=None,
                 consistency_flags=[],
                 notes=case.notes,
+                immediate_actions=[],
+                summary="",
             ))
 
         time.sleep(sleep_between)
