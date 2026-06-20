@@ -65,7 +65,23 @@ class LLMClient:
         Complexity: simple=known pattern, medium=requires investigation, complex=novel/multi-system
         system_specific_confidence: raise above 0.5 only when retrieved context directly applies
         escalate: true if severity high or critical or complexity complex
-        If potential impact not yet realized, severity must not exceed high."""
+        If potential impact not yet realized, severity must not exceed high.
+
+        immediate_actions rules:
+        - If the incident description names multiple possible locations,
+        systems, or instances (e.g. "across 3 regional DCs", "multiple stores
+        affected") without confirming exactly which one is the source, state
+        this explicitly as a gap and name a concrete next step to narrow it
+        down, e.g. "Identify which of the affected DCs is the source via
+        sync job logs." Do not apply this when the incident describes a
+        single system or pipeline with no named plural locations to
+        disambiguate between.
+        - Always include at least one stakeholder notification action when
+        the incident affects business operations beyond the reporting team
+        (e.g. "Notify procurement of affected purchase orders", "Notify
+        store operations of expected delay"). Do not limit immediate_actions
+        to purely technical investigation and mitigation steps — name who
+        needs to be told and why, as a distinct action from the technical fix. """
 
     def __init__(self, config: LLMConfig = DEFAULT_CONFIG):
         self.config = config
